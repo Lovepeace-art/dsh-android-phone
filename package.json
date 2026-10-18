@@ -1,0 +1,69 @@
+{
+  "name": "dsh-android-phone",
+  "version": "1.0.0",
+  "description": "DSH 侧栏里的安卓真机：scrcpy 实时画面 + 亚毫秒控制通道 + 截屏/长截图，并把手机操作能力作为工具交给模型",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "src",
+    "actions",
+    "scripts/install.ps1",
+    "skills",
+    "vendor",
+    "assets",
+    "cordis.patch.yml",
+    "README.md",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "license": "Apache-2.0",
+  "author": "feiniao",
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "android",
+    "scrcpy",
+    "adb",
+    "screenshot",
+    "long-screenshot",
+    "phone-automation"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/CHANGE_ME/dsh-android-phone.git"
+  },
+  "homepage": "https://github.com/CHANGE_ME/dsh-android-phone#readme",
+  "bugs": {
+    "url": "https://github.com/CHANGE_ME/dsh-android-phone/issues"
+  },
+  "os": [
+    "win32"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web"
+    }
+  },
+  "engines": {
+    "dsh": ">=0.2.0-rc.2"
+  },
+  "peerDependencies": {
+    "dsh-better-sidebar": "^0.25.0"
+  },
+  "peerDependenciesMeta": {
+    "dsh-better-sidebar": {
+      "optional": true
+    }
+  }
+}

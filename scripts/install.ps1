@@ -58,19 +58,22 @@ if (-not (Test-Path (Join-Path $Source 'index.js'))) { throw "not a plugin folde
 if (-not (Test-Path (Join-Path $Source 'client.js'))) { throw "not a plugin folder (no client.js): $Source" }
 if (-not (Test-Path (Join-Path $Source 'src\android\adb.js'))) { throw "missing src\android\adb.js in $Source" }
 
-# adb 不是本插件自带的：运行时自动去 QtScrcpy 目录 / Android SDK / PATH 里找。
-# 这里只做提示（找不到不让装——Dsh 可能装在没插手机的机器上）。
+# adb 优先级：config 的 adbPath > 插件自带 vendor\platform-tools\adb.exe > QtScrcpy 目录 > Android SDK。
+# 本包已自带 adb（vendor\），所以正常情况下这里不会告警。
 $adbHint = $AdbPath
+$adbBundled = Join-Path $Source 'vendor\platform-tools\adb.exe'
 if (-not $adbHint) {
   $cands = @(
+    $adbBundled,
     (Join-Path $env:USERPROFILE 'Desktop\QtScrcpy-win-x64-v4.2.1\QtScrcpy-win-x64-v4.2.1\adb.exe'),
     (Join-Path $env:USERPROFILE 'Desktop\QtScrcpy-win-x64-v4.2.1\adb.exe'),
     (Join-Path $env:LOCALAPPDATA 'Android\Sdk\platform-tools\adb.exe')
   )
   $adbHint = $cands | Where-Object { Test-Path $_ } | Select-Object -First 1
 }
-if ($adbHint) { Write-Host "adb      : $adbHint" }
-else { Write-Warning "没有自动找到 adb.exe；请把 QtScrcpy 目录放到桌面，或在插件 config 里写 adbPath" }
+if ($adbHint -and $adbHint -eq $adbBundled -and (Test-Path $adbBundled)) { Write-Host "adb      : $adbHint (插件自带)" }
+elseif ($adbHint) { Write-Host "adb      : $adbHint" }
+else { Write-Warning "没有找到 adb.exe；插件自带 vendor\platform-tools\adb.exe 缺失，请重新下载完整包" }
 
 $existing = Get-Item $linkPath -Force -ErrorAction SilentlyContinue
 if ($existing -and -not $existing.LinkType) {
@@ -108,7 +111,33 @@ function Update-SkillRoot {
   }
 
   $quoted = "'" + $Dir + "'"
-  $ours = '^-\s*[''"]?.*dsh-android-phone.*skills[''"]?\s*$'
+  # 坑 20：①包目录改过名（dsh-android-phone → feiniao-android-phone），所以不能把目录名写死，
+  #         只认「…android-phone\skills」这个形状；
+  #       ②列表项是缩进的（"      - '...'"），正则漏了 `^\s*` 就永远匹配不到，
+  #         于是每次安装都往 customSkillDirs 里再塞一条（实测重构后残留了旧路径）。
+  $ours = '^\s*-\s*[''"]?.*android-phone[\\/]+skills[''"]?\s*$'
+  $exact = '^\s*-\s*[''"]?' + [regex]::Escape($Dir) + '[''"]?\s*$'
+
+  # 清掉「指向本插件、但目录已不存在」的旧根（搬目录/重构后会残留），
+  # 以及重复条目（同类只保留第一条），避免 customSkillDirs 越积越多。
+  $pruned = New-Object System.Collections.Generic.List[string]
+  $prunedCount = 0
+  $seenOurs = $false
+  foreach ($l in $clean) {
+    if ($l -match '^\s*-\s*[''"]?([^''"]+)[''"]?\s*$') {
+      $p = $Matches[1].Trim()
+      if ($p -match 'android-phone' -and $p -match 'skills') {
+        if (-not (Test-Path -LiteralPath $p)) { $prunedCount++; continue }
+        if ($seenOurs) { $prunedCount++; continue }
+        $seenOurs = $true
+      }
+    }
+    [void]$pruned.Add($l)
+  }
+  if ($prunedCount -gt 0) {
+    Write-Host "pruned $prunedCount stale/duplicate skill root(s) from $File"
+    $clean = $pruned
+  }
 
   # 2) 找 `- id: skill-filesystem` 条目
   $idx = -1
@@ -131,7 +160,13 @@ function Update-SkillRoot {
       return
     }
 
-    if ($clean[$idx..($end - 1)] -match $ours) { Write-Host "skill root already present in $File"; return }
+    if ($clean[$idx..($end - 1)] -match $exact) {
+      # 坑 21：上面剪掉的重复/失效条目只在内存里，提前 return 会把这次修剪丢掉
+      # （表现：每次安装都打印 pruned 1，但列表里始终还是 2 条）。
+      if ($prunedCount -gt 0) { [System.IO.File]::WriteAllText($File, (($clean -join "`r`n") + "`r`n"), $enc) }
+      Write-Host "skill root already present in $File"
+      return
+    }
 
     $listIdx = -1
     for ($i = $idx + 1; $i -lt $end; $i++) {

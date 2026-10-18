@@ -1,0 +1,40 @@
+dsh-android-phone
+Copyright 2026 feiniao
+
+本项目包含或分发以下第三方组件。以下声明依据 Apache License 2.0 第 4(d) 条
+（NOTICE 转交义务）与本项目所分发组件的原始许可要求提供。
+
+--------------------------------------------------------------------------
+1. scrcpy-server
+--------------------------------------------------------------------------
+来源   : https://github.com/Genymobile/scrcpy  （版本 v5.0.1）
+许可证 : Apache License 2.0
+版权   : Copyright (C) 2018 Genymobile
+         Copyright (C) 2018-2026 Romain Vimont
+文件   : vendor/scrcpy-server
+说明   : scrcpy 官方发布的设备端服务程序（server），本仓库原样分发，未做任何修改。
+         本项目的视频流解析（src/android/video.js）与控制通道编码
+         （src/android/control.js）依据 scrcpy 公开的协议与源码独立实现。
+         长截图拼接（src/core/stitch.js）为独立实现，不包含 scrcpy 代码。
+
+--------------------------------------------------------------------------
+2. Android SDK Platform-Tools (adb)
+--------------------------------------------------------------------------
+来源   : https://developer.android.com/tools/releases/platform-tools  （37.0.1）
+版权   : Copyright (C) 2007-2026 The Android Open Source Project / Google LLC
+文件   : vendor/platform-tools/
+说明   : Google 官方发布的 platform-tools，本仓库原样分发，未做任何修改。
+         此处仅作为本工具的运行依赖随附，以便「拷贝即用、离线可用」。
+         其原始 NOTICE.txt 已一并保留于 vendor/platform-tools/NOTICE.txt。
+         Platform-Tools 的使用另受 Android SDK License Agreement 约束。
+
+--------------------------------------------------------------------------
+3. 交互与产品形态参考
+--------------------------------------------------------------------------
+QtScrcpy : https://github.com/barry-ran/QtScrcpy  （Apache License 2.0）
+说明     : 本项目未复制 QtScrcpy 的任何源代码，仅在其产品交互形态
+           （侧栏画面 + 触控映射 + 长截图）上作为参考。
+
+--------------------------------------------------------------------------
+本项目自身代码以 Apache License 2.0 授权，全文见 LICENSE。
+--------------------------------------------------------------------------

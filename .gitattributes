@@ -1,0 +1,28 @@
+# 换行与编码
+* text=auto
+
+# install.ps1 必须保持 UTF-8 with BOM 与原始行尾：
+# Windows PowerShell 5.1 在无 BOM 时会按 ANSI(CP936) 解码，中文注释会变乱码并报假的语法错误。
+*.ps1 -text
+
+# 源码与文本统一 LF
+*.js text eol=lf
+*.mjs text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+
+# 二进制
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.exe binary
+*.dll binary
+
+# 随包的第三方二进制不做行尾/文本处理
+vendor/** -text
+
+# GitHub 语言统计
+client.js linguist-language=JavaScript
+index.js linguist-language=JavaScript
