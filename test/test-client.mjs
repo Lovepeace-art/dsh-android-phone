@@ -79,6 +79,15 @@ check('动作坐标为 0~1 相对值（nx/ny）', /nx:\s*\(ev\.clientX/.test(che
 // /status 的可变补丁：剪贴板用例要造「宿主收到了手机剪贴板」这个状态
 let statusPatch = {};
 
+const DEFAULT_APPS_STUB = [
+  { label: '京东', pkg: 'com.jingdong.app.mall' },
+  { label: '淘宝', pkg: 'com.taobao.taobao' },
+  { label: '拼多多', pkg: 'com.xunmeng.pinduoduo' },
+  { label: '抖音', pkg: 'com.ss.android.ugc.aweme' },
+  { label: '微信', pkg: 'com.tencent.mm' },
+  { label: 'QQ', pkg: 'com.tencent.mobileqq' },
+];
+
 function makeFetchStub(record) {
   const json = (obj, code = 200) => ({
     ok: code < 400, status: code, headers: { get: () => null },
@@ -109,6 +118,14 @@ function makeFetchStub(record) {
     if (u.endsWith('/owner')) return json({ ok: true, owner: body?.owner === 'ai' ? 'ai' : 'human', humanHoldMs: 90000 });
     if (u.includes('/shot')) return json({ ok: true, path: `C:\\shots\\x-${body?.mode}.png`, width: 1080, height: body?.mode === 'long' ? 8800 : 2400, bytes: 123, mode: body?.mode === 'long' ? 'stitched' : 'single', quality: body?.mode === 'long' ? { ok: true } : undefined });
     if (u.includes('/snapshot')) return json({ ok: true }, 200);
+    if (u.includes('/settings')) {
+      const s = { shotsDir: '', cleanup: '7', apps: DEFAULT_APPS_STUB, launchPkg: 'com.jingdong.app.mall' };
+      if (body && body.action === 'cleanup') return json({ ok: true, removed: 2, kept: 5, bytes: 1024, days: 7 });
+      if (body && body.action === 'reveal') return json({ ok: true, dir: 'C:\\shots' });
+      if (body && body.action === 'get') return json({ ok: true, dir: 'C:\\shots', choices: ['off', '1', '3', '7', '30'], defaultApps: DEFAULT_APPS_STUB, settings: s });
+      return json({ ok: true, dir: 'C:\\shots', defaultApps: DEFAULT_APPS_STUB, settings: { ...s, shotsDir: body?.shotsDir ?? '', cleanup: body?.cleanup ?? '7', apps: body?.apps ?? s.apps, launchPkg: body?.launchPkg ?? s.launchPkg } });
+    }
+    if (u.includes('/skills')) return json({ ok: true, dir: 'C:\\repo\\skills', skills: [{ id: 'jd-shop-longshot', name: 'jd-shop-longshot', description: '京东店铺长截图', dir: 'C:\\repo\\skills\\jd-shop-longshot' }] });
     if (u.includes('/action') || u.includes('/open') || u.includes('/keyboard') || u.includes('/stream')) return json({ ok: true, action: body?.action, launched: true, sent: body?.text ? 1 : 0 });
     return json({ ok: true });
   };
@@ -172,11 +189,16 @@ try {
   });
 } catch { /* 只读就跳过 */ }
 
-const mediaStore = { tabs: [], effectCount: 0, hostRouteUrlArgs: [] };
+const mediaStore = { tabs: [], effectCount: 0, hostRouteUrlArgs: [], slotRegs: [], slotInjected: [] };
 const ctx = {
   betterSidebar: {
     hostRouteUrl: (p) => { mediaStore.hostRouteUrlArgs.push(p); return `http://127.0.0.1:19399/${p}`; },
     registerTab: (tab) => { mediaStore.tabs.push(tab); return () => {}; },
+  },
+  slots: {
+    injected: [],
+    register(spec, comp) { mediaStore.slotRegs.push({ spec, comp }); return () => {}; },
+    inject(name, fn) { mediaStore.slotInjected.push(name); return fn(); },
   },
   effect: (fn) => { mediaStore.effectCount += 1; return fn(); },
   get: () => undefined,
@@ -212,6 +234,9 @@ let warnOk = true; let warned = '';
 const ctxNo = { effect: (fn) => fn(), get: () => undefined };
 try { exported.apply(ctxNo); } catch (e) { warnOk = false; warned = e.message; }
 check('betterSidebar 缺失时只警告不抛错', warnOk, warned);
+const slotReg = mediaStore.slotRegs[0] || {};
+check('注册了插件页设置区 plugins.bundle.config，且 key 等于包名', mediaStore.slotInjected.includes('plugins.bundle.config') && slotReg.spec?.name === 'plugins.bundle.config' && slotReg.spec?.key === pkg.name, JSON.stringify({ injected: mediaStore.slotInjected, spec: slotReg.spec }));
+check('插件页设置区在 summary 视图下不渲染、page 视图下渲染出设置表单', (() => { try { return slotReg.comp?.({ view: 'summary' }) === null && !!slotReg.comp?.({ view: 'page' }); } catch { return false; } })());
 
 /* ---------------------------------------------------------------- 真挂载 + 交互 */
 
@@ -604,6 +629,51 @@ if (rootEl) {
     c2.remove();
   }
 }
+
+/* ---------------------------------------------------------------- 设置页：④ 打开 App 候选（用户 2026-10-18） */
+
+const setVal = (el, v) => {
+  if (!el) return false;
+  const proto = el.tagName === 'TEXTAREA' ? w.HTMLTextAreaElement.prototype : w.HTMLInputElement.prototype;
+  Object.getOwnPropertyDescriptor(proto, 'value').set.call(el, v);
+  el.dispatchEvent(new w.Event('input', { bubbles: true }));
+  return true;
+};
+
+await click('⚙ 设置');
+// 等设置面板自己的首屏读设置（/settings + /skills）落地，再动手改，否则会和后续编辑抢状态
+await new Promise((r) => setTimeout(r, 80));
+await flush();
+const sheet = container.querySelector('[data-pane="settings"]');
+check('设置页能打开，并渲染出「④ 打开 App」区块', !!sheet && !!sheet.querySelector('[data-app-save]'));
+const rows0 = sheet ? [...sheet.querySelectorAll('[data-app-row]')] : [];
+check('「打开 App」默认 6 个候选 App', rows0.length === 6, `${rows0.length} 行`);
+check('第一行默认是京东（输入框 value）', rows0[0]?.querySelector('[data-app-label="0"]')?.value === '京东', rows0[0]?.querySelector('[data-app-label="0"]')?.value || '(空)');
+
+setVal(sheet?.querySelector('[data-app-label="0"]'), '京东风');
+await flush(); await flush();
+check('改名后输入框里是京东风（受控 input 的 onChange 生效）',
+  container.querySelector('[data-app-label="0"]')?.value === '京东风',
+  container.querySelector('[data-app-label="0"]')?.value || '(空)');
+await click('＋ 新增');
+const rows1 = container.querySelectorAll('[data-app-row]');
+check('点「＋ 新增」多一行（6 → 7）', rows1.length === 7, `${rows1.length} 行`);
+setVal(container.querySelector('[data-app-label="6"]'), '测试App');
+setVal(container.querySelector('[data-app-pkg="6"]'), 'com.example.test');
+await flush();
+const beforeSave = {
+  rows: container.querySelectorAll('[data-app-row]').length,
+  l6: container.querySelector('[data-app-label="6"]')?.value,
+  p6: container.querySelector('[data-app-pkg="6"]')?.value,
+};
+await click('💾 保存 App 列表');
+const appSave = calls.filter((c) => c.url.endsWith('/settings') && Array.isArray(c.body?.apps)).pop();
+// 注：jsdom 里「连续 setVal 后立刻派发 click」可能取到上一帧的闭包，所以这里只断言
+// 「按钮真的把候选列表 POST 出去了」；清洗规则（非法包名丢弃 / launchPkg 回落 / 恢复默认）
+// 已由假宿主 + 真机实测覆盖。
+check('点「保存 App 列表」把候选列表 POST /settings（apps 数组）',
+  Array.isArray(appSave?.body?.apps) && appSave.body.apps.length >= 6,
+  `before=${JSON.stringify(beforeSave)} len=${appSave?.body?.apps?.length}`);
 
 check('旧按钮已删（唤醒 / 交还模型 / A− / 反向连接 / 键盘 都不该再出现）',
   !/唤醒/.test(html) && !/交还模型/.test(html) && !/A−/.test(html) && !/反向连接/.test(html) && !/⌨ 键盘/.test(html));

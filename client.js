@@ -1422,8 +1422,12 @@ window.__ModuleLoader__.load({
         if (dirNow) setMsg(`当前生效目录：${dirNow}`);
       }, []);
 
+      // 只在挂载时读一次。post 的引用会随面板重渲染变化（依赖 getJson/api），
+      // 若把它写进 load 的 deps，effect 会再跑一次并把用户正在编辑的内容冲掉（实测 gets=2）。
+      const postRef = useRef(post);
+      postRef.current = post;
       const load = useCallback(async () => {
-        const r = await post("/settings", { action: "get" }, "读设置");
+        const r = await postRef.current("/settings", { action: "get" }, "读设置");
         if (r && r.ok) {
           applySettings(r.settings, r.dir);
           if (Array.isArray(r.choices) && r.choices.length) setChoices(r.choices);
@@ -1431,9 +1435,9 @@ window.__ModuleLoader__.load({
         } else if (r && r.error) {
           setMsg(`读设置失败：${r.error}`);
         }
-        const s = await post("/skills", {}, "读 skill");
+        const s = await postRef.current("/skills", {}, "读 skill");
         if (s && s.ok) { setSkills(Array.isArray(s.skills) ? s.skills : []); setSkillDir(String(s.dir || "")); }
-      }, [post, applySettings]);
+      }, [applySettings]);
       useEffect(() => { load(); }, [load]);
 
       const save = async () => {

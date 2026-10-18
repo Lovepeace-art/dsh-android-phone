@@ -143,7 +143,7 @@ npm test         # 离线回归 101 项：不需要手机、不需要 DSH、不�
 
 | 命令 | 覆盖 | 需要真机 |
 |---|---|---|
-| `npm test` | `test-stitch`（35 项，长截图拼接逐像素）+ `test-client`（69 项，侧栏逻辑/交互/键盘/剪贴板/设置/打开 App） | 否 |
+| `npm test` | `test-stitch`（35 项，长截图拼接逐像素）+ `test-client`（77 项，侧栏逻辑/交互/键盘/剪贴板/设置/打开 App） | 否 |
 | `npm run test:device` | `test-plugin-tools`（工具与协议编码）+ `test-session`（单会话长跑）+ `test-host`（HTTP 接口）+ `test-e2e-jd`（京东全链路） | **是** |
 
 - 报告写到 `test/reports/`（已 gitignore）。真机测试会占用手机，跑之前把手机放一边。
