@@ -118,6 +118,7 @@ function makeFetchStub(record) {
     if (u.endsWith('/owner')) return json({ ok: true, owner: body?.owner === 'ai' ? 'ai' : 'human', humanHoldMs: 90000 });
     if (u.includes('/shot')) return json({ ok: true, path: `C:\\shots\\x-${body?.mode}.png`, width: 1080, height: body?.mode === 'long' ? 8800 : 2400, bytes: 123, mode: body?.mode === 'long' ? 'stitched' : 'single', quality: body?.mode === 'long' ? { ok: true } : undefined });
     if (u.includes('/snapshot')) return json({ ok: true }, 200);
+    if (u.includes('/apps')) return json({ ok: true, count: 3, packages: ['com.example.zeta', 'com.tencent.mm', 'com.jingdong.app.mall'] });
     if (u.includes('/settings')) {
       const s = { shotsDir: '', cleanup: '7', apps: DEFAULT_APPS_STUB, launchPkg: 'com.jingdong.app.mall' };
       if (body && body.action === 'cleanup') return json({ ok: true, removed: 2, kept: 5, bytes: 1024, days: 7 });
@@ -259,6 +260,14 @@ check('hostRouteUrl 用的是 dsh-android-phone/api（不带前导斜杠）', me
 check('渲染出画布（实时画面）', !!container.querySelector('canvas'));
 check('渲染出设备信息（型号/Android）', /WLZ-AN00/.test(html) && /Android 12/.test(html), html.slice(0, 160).replace(/\s+/g, ' '));
 check('渲染出「截图 / 长截图 / ▶ 打开」按钮', /截图/.test(html) && /长截图/.test(html) && /▶ 打开/.test(html) && !!container.querySelector('[data-open-app]'));
+await flush(); await flush();
+const launchSel = container.querySelector('[data-launch-pkg]');
+const launchVals = launchSel ? [...launchSel.querySelectorAll('option')].map((o) => o.getAttribute('value')) : [];
+check('「▶ 打开」下拉只列设置里的「常用」候选（不灌整台手机的应用，2026-10-18 用户要求）',
+  !!launchSel && launchVals.length === 6 && launchVals.includes('com.jingdong.app.mall') && !launchVals.includes('com.example.zeta'),
+  launchVals.join(','));
+check('下拉不再分组（optgroup 已删）', !!launchSel && launchSel.querySelectorAll('optgroup').length === 0,
+  launchSel ? String(launchSel.querySelectorAll('optgroup').length) : 'no select');
 check('请求打到宿主 base（/dsh-android-phone/api/status）', calls.some((c) => c.url.includes('/dsh-android-phone/api/status')), calls[0]?.url || '没有请求');
 check('没有 WebCodecs 时降级成快照模式（界面提示）', /快照|WebCodecs|退回/.test(html), (html.match(/[^>]{0,60}(快照|WebCodecs)[^<]{0,40}/) || [])[0] || '');
 check('降级后仍在轮询 /snapshot', calls.filter((c) => c.url.includes('/snapshot')).length >= 1 || true, 'jsdom 里 createImageBitmap 是桩，轮询可能尚未触发');
@@ -674,6 +683,24 @@ const appSave = calls.filter((c) => c.url.endsWith('/settings') && Array.isArray
 check('点「保存 App 列表」把候选列表 POST /settings（apps 数组）',
   Array.isArray(appSave?.body?.apps) && appSave.body.apps.length >= 6,
   `before=${JSON.stringify(beforeSave)} len=${appSave?.body?.apps?.length}`);
+
+// 「从手机添加」：设置页里挑手机已装的 App 追加成候选行（下拉里不灌全量，用户 2026-10-18 纠偏）
+const addSel = container.querySelector('[data-app-installed]');
+const addVals = addSel ? [...addSel.querySelectorAll('option')].map((o) => o.getAttribute('value')) : [];
+check('设置页「从手机添加」下拉能列出 /apps 里的真实包名', !!addSel && addVals.includes('com.example.zeta'),
+  addVals.filter(Boolean).slice(0, 6).join(','));
+const rowsBeforeAdd = container.querySelectorAll('[data-app-row]').length;
+if (addSel) {
+  const sd = Object.getOwnPropertyDescriptor(w.HTMLSelectElement.prototype, 'value');
+  if (sd && sd.set) sd.set.call(addSel, 'com.example.zeta'); else addSel.value = 'com.example.zeta';
+  addSel.dispatchEvent(new w.Event('change', { bubbles: true }));
+}
+await flush(); await flush();
+const rowsAfterAdd = container.querySelectorAll('[data-app-row]').length;
+check('「从手机添加」选一个包 → 候选列表多一行', rowsAfterAdd === rowsBeforeAdd + 1, `${rowsBeforeAdd} → ${rowsAfterAdd}`);
+check('新行的包名是刚选中的那个',
+  [...container.querySelectorAll('[data-app-pkg]')].some((el) => el.value === 'com.example.zeta'),
+  [...container.querySelectorAll('[data-app-pkg]')].map((el) => el.value).join(','));
 
 check('旧按钮已删（唤醒 / 交还模型 / A− / 反向连接 / 键盘 都不该再出现）',
   !/唤醒/.test(html) && !/交还模型/.test(html) && !/A−/.test(html) && !/反向连接/.test(html) && !/⌨ 键盘/.test(html));

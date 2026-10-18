@@ -55,7 +55,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\install.ps1
 - **清晰度**：自适应（按面板 DPR 倒推 `maxSize`）/ 省流 / 标准 / 高清，改完重新拉流
 - **截图 / 长截图**：落盘 `<shotsDir>`（默认 `~/.dsh/android-phone/shots`）
 - **⚙ 设置**：截图保存地址、自动清理天数（关闭 / 1 / 3 / 7 / 30 天）、Skill 位置（只读）、「▶ 打开」的候选 App。入口有两个：侧栏工具行的「⚙ 设置」，以及 **DSH「插件」页 → `dsh-android-phone` 详情页**（不装 better-sidebar 就在这里改）
-- **打开 App**：工具栏下拉选 App 再点「▶ 打开」。候选默认京东/淘宝/拼多多/抖音/微信/QQ，可在设置里增删；包名非法会被丢掉，全部非法则保留原列表
+- **打开 App**：工具栏下拉选 App 再点「▶ 打开」。下拉**只列设置里保存过的候选**（默认京东/淘宝/拼多多/抖音/微信/QQ）；想加手机里已装的 App，去「⚙ 设置 → ④ 打开 App → 从手机添加」挑一个再保存。包名非法会被丢掉，全部非法则保留原列表
 - **状态行**：`画面 N fps` · `M Mbps` · `编码 W×H` · `前台 <包名>`
 
 ## 会话与控制权
@@ -143,7 +143,7 @@ npm test         # 离线回归 101 项：不需要手机、不需要 DSH、不�
 
 | 命令 | 覆盖 | 需要真机 |
 |---|---|---|
-| `npm test` | `test-stitch`（35 项，长截图拼接逐像素）+ `test-client`（77 项，侧栏逻辑/交互/键盘/剪贴板/设置/打开 App） | 否 |
+| `npm test` | `test-stitch`（35 项，长截图拼接逐像素）+ `test-client`（82 项，侧栏逻辑/交互/键盘/剪贴板/设置/打开 App） | 否 |
 | `npm run test:device` | `test-plugin-tools`（工具与协议编码）+ `test-session`（单会话长跑）+ `test-host`（HTTP 接口）+ `test-e2e-jd`（京东全链路） | **是** |
 
 - 报告写到 `test/reports/`（已 gitignore）。真机测试会占用手机，跑之前把手机放一边。

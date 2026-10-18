@@ -24,6 +24,17 @@ window.__ModuleLoader__.load({
     const JD_PACKAGE = 'com.jingdong.app.mall';
     const FRAME_HEADER = 13; // 4B size + 1B flag + 8B pts
 
+    // 工具栏「▶ 打开」的兜底候选（与宿主 SETTINGS_DEFAULT_APPS 同口径）：
+    // 宿主 /settings 读不到时用它，避免下拉变成空列表（2026-10-18 用户反馈「下拉里没有更多 App」）。
+    const DEFAULT_APPS = [
+      { label: '京东', pkg: 'com.jingdong.app.mall' },
+      { label: '淘宝', pkg: 'com.taobao.taobao' },
+      { label: '拼多多', pkg: 'com.xunmeng.pinduoduo' },
+      { label: '抖音', pkg: 'com.ss.android.ugc.aweme' },
+      { label: '微信', pkg: 'com.tencent.mm' },
+      { label: 'QQ', pkg: 'com.tencent.mobileqq' },
+    ];
+
     // 与宿主 VIDEO_PRESETS 保持同一口径：maxSize 是长边像素，bitRate 是 H.264 码率。
     // 真机是 1080x2400（9:20）。默认「自适应」：按画布在屏幕上的实际设备像素反推需要的长边，
     // 传多了白烧带宽、传少了被浏览器放大成糊——这就是之前「发虚」的一半原因。
@@ -847,14 +858,14 @@ window.__ModuleLoader__.load({
       const [view, setView] = useState('cover');
       const [showSettings, setShowSettings] = useState(false);
       // 工具栏「▶ 打开」的候选 App（用户 2026-10-18：候选可配置，默认 6 个）。设置页加载/保存后会刷新。
-      const [apps, setApps] = useState(() => (APPS_CACHE && APPS_CACHE.settings && Array.isArray(APPS_CACHE.settings.apps) ? APPS_CACHE.settings.apps : []));
+      const [apps, setApps] = useState(() => (APPS_CACHE && APPS_CACHE.settings && Array.isArray(APPS_CACHE.settings.apps) && APPS_CACHE.settings.apps.length ? APPS_CACHE.settings.apps : DEFAULT_APPS));
       const [launchPkg, setLaunchPkg] = useState(() => (APPS_CACHE && APPS_CACHE.settings && APPS_CACHE.settings.launchPkg) || JD_PACKAGE);
       useEffect(() => {
         if (showSettings) return undefined;   // 设置页开着时不抢它的请求
         let dead = false;
         fetchSettings(ctx).then((j) => {
           if (dead || !j || !j.settings) return;
-          setApps(Array.isArray(j.settings.apps) ? j.settings.apps : []);
+          setApps(Array.isArray(j.settings.apps) && j.settings.apps.length ? j.settings.apps : DEFAULT_APPS);
           setLaunchPkg(j.settings.launchPkg || JD_PACKAGE);
         });
         return () => { dead = true; };
@@ -1314,15 +1325,15 @@ window.__ModuleLoader__.load({
         h('div', { key: 'bar1', style: S.bar },
           captureBtn,
           h('select', {
-            style: { ...S.select, maxWidth: '7em' },
+            style: { ...S.select, maxWidth: '9em' },
             value: launchPkg, 'data-launch-pkg': launchPkg,
-            title: '要打开的 App（候选可在「⚙ 设置 → 打开 App」里增删）',
+            title: '要打开的 App（候选在「⚙ 设置 → 打开 App」里增删；想加手机里已有的 App 也在那里选）',
             onChange: async (e) => {
               const pkg = e.target.value;
               setLaunchPkg(pkg);
               await post('/settings', { launchPkg: pkg }, '记住默认 App');
             },
-          }, (apps.length ? apps : [{ label: '京东', pkg: JD_PACKAGE }]).map((a) => h('option', { key: a.pkg, value: a.pkg }, a.label || a.pkg))),
+          }, (apps.length ? apps : DEFAULT_APPS).map((a) => h('option', { key: a.pkg, value: a.pkg }, a.label || a.pkg))),
           h('button', {
             style: { ...S.btn, ...S.btnPrimary },
             'data-open-app': '1',
@@ -1411,6 +1422,8 @@ window.__ModuleLoader__.load({
       const [apps, setApps] = useState([]);
       const [launchPkg, setLaunchPkg] = useState("");
       const [defaultApps, setDefaultApps] = useState([]);
+      const [installed, setInstalled] = useState([]);      // 手机里已安装的第三方应用（/apps）
+      const [instFilter, setInstFilter] = useState("");     // 「从手机添加」的包名筛选
       const [msg, setMsg] = useState("");
 
       const applySettings = useCallback((st, dirNow) => {
@@ -1437,8 +1450,21 @@ window.__ModuleLoader__.load({
         }
         const s = await postRef.current("/skills", {}, "读 skill");
         if (s && s.ok) { setSkills(Array.isArray(s.skills) ? s.skills : []); setSkillDir(String(s.dir || "")); }
+        const a = await postRef.current("/apps", {}, "读应用列表");
+        if (a && a.ok && Array.isArray(a.packages)) setInstalled(a.packages);
       }, [applySettings]);
       useEffect(() => { load(); }, [load]);
+
+      // 「从手机添加」：把 /apps 里的包名追加成一行（名字先用包名最后一段，用户可改）
+      const guessLabel = (pkg) => { const seg = String(pkg || "").split(".").filter(Boolean); return seg.length ? seg[seg.length - 1] : String(pkg || ""); };
+      const addInstalled = (pkg) => {
+        if (!pkg) return;
+        setApps((prev) => (prev.some((a) => a.pkg === pkg) ? prev : [...prev, { label: guessLabel(pkg), pkg }]));
+      };
+      const instFiltered = installed.filter((pk) => {
+        const q = instFilter.trim().toLowerCase();
+        return !q || pk.toLowerCase().includes(q);
+      });
 
       const save = async () => {
         const r = await post("/settings", { shotsDir: dir.trim(), cleanup }, "保存设置");
@@ -1520,7 +1546,7 @@ window.__ModuleLoader__.load({
         ),
         h("div", { style: S.settingsBlock },
           h("div", { style: S.hintTitle }, "④ 打开 App（工具栏「▶ 打开」的候选）"),
-          h("div", { style: bodyS }, "包名填 Android 应用包名，例如 com.taobao.taobao。改完点「💾 保存 App 列表」才生效。"),
+          h("div", { style: bodyS }, "这里配的就是工具栏下拉里的候选（只列这些，不灌整台手机）。想加手机里已有的 App：用下面的「从手机添加」挑一个，改完点「💾 保存 App 列表」才生效。"),
           apps.length === 0
             ? h("div", { style: bodyS }, "（空，点下面「＋ 新增」或「恢复默认列表」）")
             : null,
@@ -1544,6 +1570,22 @@ window.__ModuleLoader__.load({
               style: S.btn,
               onClick: () => setApps((defaultApps.length ? defaultApps : []).map((a) => ({ label: a.label, pkg: a.pkg }))),
             }, "恢复默认列表"),
+          ),
+          h("div", { style: rowS },
+            h("span", { style: bodyS }, "从手机添加："),
+            h("input", {
+              style: { ...S.input, flex: "1 1 7em", minWidth: 0 },
+              placeholder: "筛选包名", value: instFilter, spellCheck: false, "data-app-filter": "1",
+              onChange: (e) => setInstFilter(e.target.value),
+            }),
+            h("select", {
+              style: { ...S.select, flex: "1 1 9em", minWidth: 0 },
+              value: "", "data-app-installed": "1",
+              onChange: (e) => { addInstalled(e.target.value); e.target.value = ""; },
+            },
+              h("option", { value: "" }, instFiltered.length ? `选一个（${instFiltered.length}）…` : (installed.length ? "没有匹配的包名" : "正在读手机应用…")),
+              instFiltered.slice(0, 300).map((pk) => h("option", { key: pk, value: pk }, pk)),
+            ),
           ),
           h("div", { style: rowS },
             h("span", { style: bodyS }, "工具栏默认选中："),
