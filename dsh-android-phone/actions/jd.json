@@ -1,0 +1,24 @@
+{
+  "name": "jd",
+  "app": "京东 App",
+  "package": "com.jingdong.app.mall",
+  "screen": { "width": 1080, "height": 2400, "dpi": 480 },
+  "coordNote": "坐标一律归一化 0~1（x/宽, y/高），改分辨率不用改动作表（借 QtScrcpy keymap 的口径）。本表在 1080x2400（华为 nova 6 5G）上用 uiautomator dump 标定。",
+  "actions": {
+    "launch": { "type": "launch", "package": "com.jingdong.app.mall", "comment": "启动京东 App" },
+    "swipe-up": { "type": "drag", "from": [0.5, 0.72], "to": [0.5, 0.28], "ms": 320, "comment": "手指上滑（内容前进一步，约 0.44 屏）" },
+    "swipe-down": { "type": "drag", "from": [0.5, 0.28], "to": [0.5, 0.72], "ms": 320, "comment": "手指下滑（内容回退）" },
+    "scroll-up-half": { "type": "scroll", "pages": 0.5, "dir": "up", "comment": "整屏手势滚动半屏" },
+    "tab-home": { "type": "tap", "at": [0.1, 0.945], "comment": "底部「首页」" },
+    "tab-market": { "type": "tap", "at": [0.3, 0.945], "comment": "底部「逛」（京喜/内容流）" },
+    "tab-cart": { "type": "tap", "at": [0.7, 0.945], "comment": "底部「购物车」" },
+    "tab-mine": { "type": "tap", "at": [0.9, 0.945], "comment": "底部「我的」" },
+    "search-tap": { "type": "tap", "at": [0.5, 0.055], "comment": "顶部搜索框（首页/频道页通用）" },
+    "search-submit": { "type": "key", "key": "ENTER", "comment": "提交搜索（先 search-tap + 输入关键词）" },
+    "back": { "type": "key", "key": "BACK", "comment": "返回（关弹窗/回上一页）" },
+    "home": { "type": "key", "key": "HOME", "comment": "回桌面" },
+    "dismiss-popup": { "type": "key", "key": "BACK", "comment": "关掉「打开京东APP」之外的 App 内弹窗（登录框要先挂起账号档）" },
+    "wait-1s": { "type": "wait", "ms": 1000, "comment": "等 1 秒（等页面/动画）" },
+    "wait-3s": { "type": "wait", "ms": 3000, "comment": "等 3 秒（等首屏加载）" }
+  }
+}

@@ -1,0 +1,24 @@
+# dsh-android-phone —— 把「安卓真机」挂进 DSH。
+#
+# config 说明：
+#   adbPath       adb.exe 路径；留空则自动找（QtScrcpy 目录 → Android SDK → PATH）
+#   defaultSerial 默认设备序列号；留空则要求恰好一台在线设备
+#   scrcpyServer  scrcpy-server 路径；留空则自动找 QtScrcpy 目录 / vendor
+#   shotsDir      截图落盘目录；留空则 ~/.dsh/android-phone/shots
+#   video         侧栏实时画面（H.264）参数：maxSize / maxFps / bitRate
+#
+#   maxSize 是编码**长边**上限（1080x2400 的机器上 1024 → 460x1024）。
+#   侧栏右下角还有「自适应/省流/标准/高清」档位：一旦侧栏在看，尺寸由侧栏按画布实际像素
+#   反推并重新拉流，这里的值只在「没人看、纯模型跑」时生效。别调到 1024 以下：
+#   那会在人打开侧栏时因为尺寸不一致多重启一次会话（见 PROGRESS.md 坑 15）。
+- insert:
+    - id: android-phone
+      name: 'dsh-android-phone'
+      config:
+        adbPath: ''
+        defaultSerial: ''
+        scrcpyServer: ''
+        shotsDir: ''
+        video:
+          maxSize: 1024
+          maxFps: 60

@@ -1,0 +1,22 @@
+# 依赖与测试用的临时运行时（test-client 需要 react/react-dom/jsdom）
+node_modules/
+.client-test/
+
+# 诊断产物与离线预览（不是交付物；报告在 PROGRESS.md 里有摘要）
+recon/
+
+# 日志与系统垃圾
+*.log
+Thumbs.db
+.DS_Store
+
+# vendor 里是第三方二进制（adb platform-tools + scrcpy-server v5.0.1），
+# 提交它才能「拷目录即用」；不想进 git 就取消下面两行注释，由 scripts/install.ps1 负责补齐。
+# dsh-android-phone/vendor/platform-tools/
+# dsh-android-phone/vendor/scrcpy-server
+# 运行时临时目录与技能跑出来的产物
+.tmp/
+out/
+
+# 开发过程存档（保留在磁盘，不发布）
+archive/

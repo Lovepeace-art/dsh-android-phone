@@ -1,0 +1,137 @@
+飞鸟 · DSH 安卓真机控制插件（dsh-android-phone）
+打包时间：2026-10-16（v0.2.0：控制通道 + 单会话 + 低延迟渲染）
+配套 skill：jd-mall-capture（京东 App 搜索店铺 →「一屏到底」长截图）
+
+========================================================================
+一、这个包里有什么
+========================================================================
+dsh-android-phone\          DSH 插件本体：侧栏实时手机画面 + 宿主/模型控制能力
+  index.js                  宿主侧：注册 11 个 phone_* 工具 + /dsh-android-phone/api 路由
+  client.js                 侧栏侧：WebCodecs 解 H.264 到 canvas、点击/长按/拖拽/滚轮、截图/长截图、接管按钮
+  cordis.patch.yml          插件对宿主的 patch（侧栏 tab 注入等）
+  package.json              插件清单
+  README.md                 开发/协议说明（含 scrcpy 取流与控制协议细节）
+  src\android\adb.js        adb 定位、设备选择、uiautomator、输入、截屏
+  src\android\video.js      scrcpy 取流（反向 tunnel 为主 + forward 兜底、控制 socket、backlog 回放）
+  src\android\control.js    scrcpy 控制通道（23 种消息编码，含中文/真拖拽/滚轮/剪贴板/START_APP）
+  src\android\session.js    单会话管理 + 控制权（AI 优先、人可强抢、崩溃自愈）
+  src\android\longshot.js   滚动长截图
+  src\android\overlay.js    控件树识别顶部/底部固定栏（拼接时遮罩）
+  src\android\actions.js    归一化坐标动作表引擎（后端优先控制通道，回落 adb）
+  src\core\*.js             PNG 编解码、运动估计增量拼接、附件预览、质量自检
+  scripts\install.ps1       安装/卸载脚本（junction 或 -Copy 自包含；含 skill 根注册）
+  scripts\*.mjs             探针与回归测试（就是「验证报告」里那些结果）
+  actions\jd.json           京东 App 动作表（0~1 归一化坐标）
+  skills\jd-mall-capture\   配套 skill（随包走，install.ps1 自动注册，无需手动拷）
+  vendor\platform-tools\    adb.exe（platform-tools 37.0.1）+ 两个 DLL —— 开箱可用
+  vendor\scrcpy-server      scrcpy v5.0.1 的 server（733930B）—— 开箱可用
+
+验证报告\                   最近一次真机回归的原始 JSON 结果（旧一轮）
+recon\reports\              新一轮回归报告（test-*.mjs 生成）
+
+========================================================================
+二、环境要求
+========================================================================
+1. Windows + DSH（desktop profile，且至少启动过一次）
+2. 安卓手机：开发者选项 → USB 调试打开，插上后在本机授权；操作期间保持解锁
+3. Node ≥ 20（DSH 自带）
+4. **不需要再装 QtScrcpy / Android SDK**：adb 与 scrcpy-server 已随包放在 vendor\
+   （插件仍支持用 QtScrcpy 目录里的那份，查找顺序见 README）
+   实测机型：HUAWEI WLZ-AN00（nova 6 5G）/ Android 12 / 1080x2400 / density 480
+
+========================================================================
+三、安装（3 步）
+========================================================================
+1) 把 dsh-android-phone 整个文件夹拷到任意位置，例如 D:\Ruan\dsh-android-phone
+2) 在该文件夹里执行（默认 link 模式：指向源码目录，改完即时生效，推荐）：
+     powershell -NoProfile -ExecutionPolicy Bypass -File scripts\install.ps1
+   装成自包含副本（不依赖源码目录，适合发给别人）：
+     powershell -NoProfile -ExecutionPolicy Bypass -File scripts\install.ps1 -Copy
+   只预览会改什么、不落盘：
+     powershell -NoProfile -ExecutionPolicy Bypass -File scripts\install.ps1 -WhatIfOnly
+   卸载（还原 profile 清单 + 摘掉 skill 根）：
+     powershell -NoProfile -ExecutionPolicy Bypass -File scripts\install.ps1 -Uninstall
+   说明：官方 `dsh plugin add` 会拒绝 desktop profile（Electron 应用独占管理），
+        这个脚本替它做四件事：把包放到加载器能找到的位置、写进 dsh.profile.bundles、
+        声明依赖、把 <插件目录>\skills 并进 cordis.patch.yml 里 skill-filesystem 的
+        customSkillDirs（**是并进已有列表，不会覆盖别的插件注册的技能根**）。
+        执行前会备份 profile 的 package.json / cordis.patch.yml（*.bak-android-phone）。
+3) 重启 DSH → 右侧打开「手机」tab（之前开着的话关掉再开，或 Ctrl+R 硬刷新）
+   重启后技能列表里应出现 jd-mall-capture（若没出现，看排障第 4 条）
+
+   生效规则：改 index.js / src\**（宿主侧）→ 必须重启 DSH；
+             改 client.js（侧栏侧）→ 硬刷新侧栏即可。
+   注意：install.ps1 必须保持 UTF-8 **带 BOM**。Windows PowerShell 5.1 读无 BOM 的
+        .ps1 会按 ANSI 解码，中文注释变乱码后会报一堆假的「Missing closing '}'」。
+
+========================================================================
+四、怎么用
+========================================================================
+· 工具行：打开京东 / 唤醒 / 返回 / 桌面 / 任务 / 截图 / 长截图 / 画质 / 文字输入 / 提交
+· 画面：默认「自适应」清晰度（按侧栏 DPR 倒推）；点右上角按钮切换「铺满 / 完整」
+        鼠标单击 = 点按，按住移动 = 拖拽（真拖拽：DOWN + 连续 MOVE + UP），
+        滚轮 = 滚动（16ms 合并，最多 1.2 屏/次），输入框可直接发中文
+· 控制权：默认「🤖 模型持有」。人想动手 → 点「✋ 接管」（或 phone_takeover），
+        此时模型的动作会被拒绝；人静默 90 秒自动交还，也可点「↩ 交还模型」立刻还
+· 会话：打开侧栏自动起会话（单会话 = 一路 video + 一路 control，约 1.5s 就绪）；
+        关掉侧栏后若无人订阅也无人操作，45 秒后才停（模型在后台也能操作手机）
+· 模型侧工具（11 个）：phone_status / phone_apps / phone_open / phone_screenshot /
+        phone_longshot / phone_inspect / phone_action / phone_keyboard /
+        phone_stream / phone_preset / phone_takeover
+· 长截图：跑到目标页面后点「长截图」，或让 skill 跑 jd-shop-longshot.mjs
+        （起会话 → 开京东 → 关开屏广告 → 搜索框 → 中文关键字 → 店铺 tab → 进店 →
+         滚动拼接 → 落盘 + 自检）
+
+========================================================================
+五、本轮改了什么（v0.2.0，全部真机验证）
+========================================================================
+1. 控制通道打通（最大的一块）：scrcpy 的 `control` 原来写死 false，所有输入都退回
+   `adb shell input`——它在设备上每执行一次都要冷启一个 ART 虚拟机，实测 tap 306ms、
+   滚动 674ms、输入中文直接报错。现在 `control=true`，输入走 scrcpy 控制通道
+   （宿主侧发出耗时 ~115µs，**791×**），并且顺带拿到：真拖拽、精确滚轮、中文直接输入、
+   START_APP 直接拉 App、剪贴板、UHID 等。
+2. 连接方向改成反向为主：同一台设备同一个 server，`adb forward` 路径上 server 会在
+   2–4 秒内静默停止采集（logcat 里没有任何异常，是干净退出、间歇性复发）；改成
+   `tunnel_forward=false` + `adb reverse` 后 3/3 稳定跑满 20 秒。起流也从 9.8s 降到 1.5s。
+3. 单会话 + 控制权模型：video 与 control 由同一个 server 进程提供（session.js 统一管理），
+   跟随侧栏打开；模型操作前自动起会话；AI 运行时人只观看、人可强抢。
+4. 低延迟渲染：侧栏解码队列阈值 12 帧 → 2 帧、宿主写帧加真背压（积压 >4MB 丢帧而不是
+   堆内存）、画质默认「自适应」（按面板 DPR 倒推 maxSize）、快照兜底改高质量重采样。
+5. 打包自包含：vendor\ 里带上 adb（platform-tools 37.0.1）与 scrcpy-server（v5.0.1），
+   清掉了源码里写死的别人机器路径（C:\Users\30716\...、D:\Ruan\...）。
+6. 技能随包走：skills\jd-mall-capture 由 install.ps1 注册进 profile 的 skill-filesystem。
+7. 顺手修：resolveAdb 依赖 process.cwd()（DSH 宿主进程的 cwd 不是插件目录 → 找不到
+   adb）→ 改成按插件自身位置解析；install.ps1 的 UTF-8 BOM 问题；test-stitch 报告目录
+   不存在时报 ENOENT。
+
+回归结果（全绿，报告在 recon\reports\）：
+  scripts\test-plugin-tools.mjs     工具/路由/控制消息字节数/控制权模型   30 / 30
+  scripts\test-stitch.mjs           逐帧拼接器逐像素回归                 35 / 35
+  scripts\test-client.mjs           侧栏侧（jsdom）                      40 / 40
+  scripts\test-host.mjs             宿主侧 + HTTP 接口 + 真机取流        36 / 36
+  scripts\test-session.mjs 18       单会话长跑 + 控制注入落地 + 延迟对照  11 / 11
+  scripts\test-e2e-jd.mjs           京东端到端（搜索店铺 + 长截图）       全绿
+  跑法：node scripts\<名字>.mjs（test-stitch / test-plugin-tools 不需要手机）
+  test-client.mjs 需要 react/react-dom/jsdom，放在 <包目录>\..\.client-test\node_modules
+
+还没眼验（发虚这条按计划先跳过）：
+  ·「铺满 / 完整」切换、点击坐标映射、滚轮合并节流 —— 代码已落地，待重启后在真实侧栏逐个看
+  ·「侧栏字体渲染发虚/发大」这条现象待确认（是工具行按钮的字，还是手机画面里的字）
+
+========================================================================
+六、排障
+========================================================================
+1. 侧栏提示「找不到 adb」：插件自带 vendor\platform-tools\adb.exe，正常不该出现；
+   若出现，检查 vendor 是否被删，或安装时用 -AdbPath "C:\...\adb.exe" 指定
+2. 侧栏一直转「连接中」/黑屏：先 `vendor\platform-tools\adb.exe devices` 确认设备在线
+   且已授权；手机保持解锁；若 QtScrcpy 桌面窗口正开着同一台手机，先关掉它
+   （scrcpy 同一时刻只允许一个消费者）
+3. 模型动作被拒：「手机控制权已被人工接管（owner=human）」→ 侧栏点「↩ 交还模型」，
+   或调 phone_takeover {owner:'ai'}；反过来人想接管就点「✋ 接管」
+4. 重启后技能列表里没有 jd-mall-capture：检查 profile 的 cordis.patch.yml 里
+   skill-filesystem 的 customSkillDirs 是否包含 <插件目录>\skills；不要新增第二条
+   `- id: skill-filesystem`（同 id 多条会互相覆盖，会连带别的插件的技能根一起失效）
+5. 改了宿主代码没反应：index.js / src\** 必须重启 DSH；只有 client.js 靠硬刷新
+6. 想让模型直接看：用 phone_inspect / phone_screenshot / phone_longshot，
+   截图与长截图会作为附件返回；注意控制通道的坐标口径是**视频尺寸**（如 808x1800），
+   不是设备物理像素（1080x2400）
