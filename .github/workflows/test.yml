@@ -1,0 +1,39 @@
+name: test
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  offline:
+    name: 离线回归 (node ${{ matrix.node }} / ${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        node: [20, 22]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+
+      # 只装离线测试用的 devDependencies（react / react-dom / jsdom）；
+      # 插件的运行时不依赖任何 npm 包，peerDependencies 里的 dsh-better-sidebar 是 optional。
+      - name: 安装测试依赖
+        run: npm install --no-audit --no-fund
+
+      - name: 离线回归（不需要真机）
+        run: npm test
+
+      - name: 上传测试报告
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reports-${{ matrix.os }}-node${{ matrix.node }}
+          path: test/reports/
+          if-no-files-found: ignore

@@ -146,6 +146,24 @@ node skills/jd-mall-capture/scripts/jd-shop-longshot.mjs --keyword 牛奶 --shop
 4. **坐标用视频尺寸，不是设备像素**：服务端 `PositionMapper.map()` 要求 `Position.screenSize` 严格等于编码尺寸，不等就直接丢弃，只在 VERBOSE 日志里说一句。
 5. **指针 DOWN/UP 每根手指都要发**：`POINTER_DOWN/UP` 由服务端改写并补 `pointerIndex`，客户端发 5/6 会让 Android 判定「index 0 又按了一次」而整条丢弃。
 
+## 测试
+
+仓库自带两套测试，**改代码请先跑离线那套**（CI 也是跑它）：
+
+```bash
+npm install      # 只装离线测试依赖（react / react-dom / jsdom），插件运行时零 npm 依赖
+npm test         # 离线回归：不需要手机、不需要 DSH、不需要浏览器
+```
+
+| 命令 | 覆盖 | 需要真机 |
+|---|---|---|
+| `npm test` | `test-stitch`（35 项，长截图拼接逐像素）+ `test-client`（66 项，侧栏逻辑/交互/键盘/剪贴板） | 否 |
+| `npm run test:device` | `test-plugin-tools`（工具与协议编码）+ `test-session`（单会话长跑）+ `test-host`（HTTP 接口）+ `test-e2e-jd`（京东全链路） | **是** |
+
+- 报告写到 `test/reports/`（已 gitignore）。
+- 真机测试会占用手机：`test-e2e-jd` 会打开京东、搜索、进店铺、跑长截图；跑之前请把手机放一边。
+- CI 见 `.github/workflows/test.yml`：push / PR 时在 ubuntu + windows × node 20/22 上跑 `npm test`。
+
 ## 已知限制
 
 - 仅 Windows

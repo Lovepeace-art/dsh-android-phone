@@ -23,3 +23,5 @@ out/
 # 本地诊断产物（开发期用，不发布）
 recon/
 archive/
+# 测试产物（报告 / 临时帧）
+test/reports/

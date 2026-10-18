@@ -58,6 +58,17 @@
   "engines": {
     "dsh": ">=0.2.0-rc.2"
   },
+  "scripts": {
+    "test": "node test/test-stitch.mjs && node test/test-client.mjs",
+    "test:offline": "node test/test-stitch.mjs && node test/test-client.mjs",
+    "test:device": "node test/test-plugin-tools.mjs && node test/test-session.mjs && node test/test-host.mjs && node test/test-e2e-jd.mjs",
+    "install:profile": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/install.ps1"
+  },
+  "devDependencies": {
+    "jsdom": "^30.1.3",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
+  },
   "peerDependencies": {
     "dsh-better-sidebar": "^0.25.0"
   },

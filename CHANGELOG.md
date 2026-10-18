@@ -26,6 +26,12 @@
 - 视频流正常结束也要重连，修「画面冻在最后一帧」
 - 侧栏 UI 适配浅色/深色主题，字号随面板宽度自适应
 
+### 测试
+
+- `npm test`：离线回归（`test-stitch` 35 项 + `test-client` 66 项），不需要真机；CI 跑的就是这套
+- `npm run test:device`：真机回归（`test-plugin-tools` 工具与协议编码、`test-session` 单会话长跑、`test-host` HTTP 接口、`test-e2e-jd` 京东全链路）
+- GitHub Actions：ubuntu + windows × node 20/22，push / PR 自动跑
+
 ### 已知限制
 
 - 仅 Windows（`install.ps1` 与随包的 `adb.exe`）
