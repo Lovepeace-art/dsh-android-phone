@@ -93,13 +93,15 @@ POST /session /owner /takeover /action /open /keyboard /inspect
 
 `GET /video` 返回 `application/octet-stream`：每帧 `4B 长度 + 1B flag + 8B pts + Annex-B 负载`，响应头带 `X-Video-Width` / `X-Video-Height` / `X-Scrcpy-Version`。
 
-## 附带 skill
+## 附带 skill（可选）
 
-`skills/jd-mall-capture` —— 京东搜索关键字 → 切「店铺」tab → 进目标店铺 → 店铺首页长截图。安装时自动注册到 profile，也可脱离插件单独跑：
+`skills/jd-shop-longshot` —— 京东搜索关键字 → 切「店铺」tab → 进目标店铺 → 店铺首页长截图。安装时自动注册到 profile，也可脱离插件单独跑：
 
 ```bash
-node skills/jd-mall-capture/scripts/jd-shop-longshot.mjs --keyword 牛奶 --shop 每日鲜语
+node skills/jd-shop-longshot/scripts/jd-shop-longshot.mjs --keyword 牛奶 --shop 每日鲜语
 ```
+
+`skills/` 只是约定位置：插件能力不依赖任何 skill。删掉自带的 skill（只留 `skills/README.md`）安装照样成功，只是不注册 skill 根。
 
 ## 工作原理
 

@@ -1,5 +1,5 @@
 ---
-name: jd-mall-capture
+name: jd-shop-longshot
 description: 用安卓真机打开京东 App，搜索关键字 → 切「店铺」tab → 进目标店铺 → 把店铺首页长截图成一张整页图。用于店铺首页/商品列表/搜索结果这类 App 内页面的截图取证。
 whenToUse: 用户要京东 App（不是网页版）的店铺页面截图、店铺首页长截图、按关键字搜店铺再截图；或需要可复现、可复现落点的 App 内页面长图。手机没连、没开 USB 调试、DSH 里没装 dsh-android-phone 插件、或要的是网页版时不要用本 skill。
 metadata:
@@ -21,7 +21,7 @@ metadata:
 （装好后是 `%USERPROFILE%\.dsh\profiles\desktop\vendor\dsh-android-phone`，源码树里就是 `dsh-android-phone`）。
 
 ```powershell
-node <插件目录>\skills\jd-mall-capture\scripts\jd-shop-longshot.mjs --keyword 牛奶 --shop 每日鲜语
+node <插件目录>\skills\jd-shop-longshot\scripts\jd-shop-longshot.mjs --keyword 牛奶 --shop 每日鲜语
 ```
 
 它自己完成：起会话 → 打开京东 → 关开屏广告落首页 → 点搜索框 → 输中文关键字 → 回车 →
@@ -99,14 +99,14 @@ node <插件目录>\skills\jd-mall-capture\scripts\jd-shop-longshot.mjs --keywor
 
 ## 备用：不依赖插件的老路径
 
-`<插件目录>\skills\jd-mall-capture\scripts\jd-capture.mjs` 是改造前的 CLI 执行器：自己调 `adb` 截图与拼接，
+`<插件目录>\skills\jd-shop-longshot\scripts\jd-capture.mjs` 是改造前的 CLI 执行器：自己调 `adb` 截图与拼接，
 **不需要插件**，但每步输入走 `adb shell input`（慢、只支持 ASCII），且不能搜中文关键字。
 只在插件没装/起不来时当兜底：
 
 ```powershell
-node <插件目录>\skills\jd-mall-capture\scripts\jd-capture.mjs --steps 8          # 当前页面长截图
-node <插件目录>\skills\jd-mall-capture\scripts\jd-capture.mjs --pre tab-mine,wait-3s --out-dir recon\shots
-node <插件目录>\skills\jd-mall-capture\scripts\jd-capture.mjs --no-launch --steps 5 --json
+node <插件目录>\skills\jd-shop-longshot\scripts\jd-capture.mjs --steps 8          # 当前页面长截图
+node <插件目录>\skills\jd-shop-longshot\scripts\jd-capture.mjs --pre tab-mine,wait-3s --out-dir recon\shots
+node <插件目录>\skills\jd-shop-longshot\scripts\jd-capture.mjs --no-launch --steps 5 --json
 ```
 
 ## 联调提示（开发用）
@@ -118,7 +118,7 @@ node <插件目录>\skills\jd-mall-capture\scripts\jd-capture.mjs --no-launch --
 
 ```powershell
 node <插件目录>\scripts\serve-api.mjs --port 19399            # 另开一个窗口
-node <插件目录>\skills\jd-mall-capture\scripts\jd-shop-longshot.mjs --keyword 牛奶 --json
+node <插件目录>\skills\jd-shop-longshot\scripts\jd-shop-longshot.mjs --keyword 牛奶 --json
 ```
 
 `pass/fail` 全过、`control: true`、长截图高度 > 2000 就算这套链路是好的。

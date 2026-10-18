@@ -5,7 +5,7 @@
  *       逐帧滚动拼接长截图 → 质量自检（重复贴段/未遮固定栏）→ 落盘 PNG + sidecar JSON。
  *
  * 用法：
- *   node .agents/skills/jd-mall-capture/scripts/jd-capture.mjs [选项]
+ *   node .agents/skills/jd-shop-longshot/scripts/jd-capture.mjs [选项]
  *     --serial <序列号>   指定设备（默认取唯一在线设备）
  *     --out-dir <目录>    产物目录（默认 <工作区>/recon/android-shots）
  *     --pre a,b           长截图前依次执行的动作名（来自 dsh-android-phone/actions/jd.json）

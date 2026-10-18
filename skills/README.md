@@ -1,0 +1,21 @@
+# skills/
+
+插件自带的 skill 放在这里，每个 skill 一个子目录，子目录里必须有 `SKILL.md`：
+
+```
+skills/
+└─ <skill-name>/
+   ├─ SKILL.md          # 必须有：frontmatter 的 name / description / whenToUse + 正文
+   └─ scripts/          # 可选：配套脚本
+```
+
+安装时 `install.ps1` 会把 **`<插件目录>\skills`** 并进 profile 的
+`skill-filesystem` → `customSkillDirs`，所以放进来就会被 DSH 发现（改完要重启 DSH）。
+
+## 这个目录可以是空的
+
+`skills/` 只是约定位置，插件能力（12 个 `phone_*` 工具 + 18 个 HTTP 接口）
+**完全不依赖任何 skill**。没有 skill 时安装脚本会打印
+「插件包没自带 skill —— 只装插件，不注册 skill 根」并照常完成安装。
+
+自带的 skill 属于示例 / 业务定制，可以整个删掉，只留这个 `README.md` 占位。

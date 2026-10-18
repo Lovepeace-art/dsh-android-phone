@@ -127,14 +127,11 @@ if (existsSync(profilesDir)) {
 if (installed) {
   add(installed.linked, `profile 里指向本仓库（${installed.prof}）`, installed.linked ? installed.dir : `junction 不存在或指向别处：跑 npm run install:profile`);
   add(installed.bundled, '已注册进 dsh.profile.bundles', installed.bundled ? '' : '跑 npm run install:profile');
-  add(installed.skillRoot, '插件 skill 已并进 profile', installed.skillRoot ? '' : '跑 npm run install:profile');
+
 } else {
   add(false, '没找到 DSH desktop profile', `${profilesDir} 不存在：DSH 装了吗？装好后跑 npm run install:profile`);
 }
 
-// ── 7. 附带 skill ───────────────────────────────────────────
-const skillMd = join(ROOT, 'skills', 'jd-mall-capture', 'SKILL.md');
-add(existsSync(skillMd), '附带 skill jd-mall-capture 存在', existsSync(skillMd) ? '' : '缺文件，skill 不会出现在技能列表');
 
 // ── 输出 ────────────────────────────────────────────────────
 const bad = rows.filter((r) => !r.ok).length;

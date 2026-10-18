@@ -85,7 +85,17 @@ if ($existing -and -not $existing.LinkType) {
 # `skill-filesystem` 行的 customSkillDirs 白名单，所以这里把 "<插件目录>\skills" 并进去。
 # **必须在已有条目里加一项**，不能新加一条 `- id: skill-filesystem` —— 同 id 多条目时
 # 后者会覆盖前者，会把别的插件（如 dsh-sanjip-ops）注册的技能根整个抹掉。
-$skillName = 'jd-mall-capture'
+# 技能名不写死：插件包可以完全不带 skill（公共仓库只保留 skills\ 目录），也可以放任意多个
+# 自己的 skill。这里动态取第一个带 SKILL.md 的子目录名；没有就跳过 skill 根接线。
+function Get-BundledSkillName {
+  param([string]$SkillsDir)
+  if (-not (Test-Path -LiteralPath $SkillsDir)) { return $null }
+  $hit = Get-ChildItem -LiteralPath $SkillsDir -Directory -ErrorAction SilentlyContinue |
+    Where-Object { Test-Path -LiteralPath (Join-Path $_.FullName 'SKILL.md') } |
+    Select-Object -First 1
+  if ($hit) { return $hit.Name }
+  return $null
+}
 
 function Update-SkillRoot {
   param([string]$File, [string]$Dir, [switch]$Remove)
@@ -304,10 +314,11 @@ Write-Host 'profile manifest is valid JSON'
 
 # --------------------------------------------------- 3b. 注册 skill 根（技能随插件走）
 $skillDir = Join-Path $target 'skills'
-if (Test-Path (Join-Path $skillDir $skillName) -PathType Container) {
+$skillName = Get-BundledSkillName $skillDir
+if ($skillName) {
   Update-SkillRoot -File $patchFile -Dir $skillDir
 } else {
-  Write-Warning "没找到技能目录 $skillDir\$skillName —— 只装插件，不注册 skill 根"
+  Write-Host "插件包没自带 skill（$skillDir 下没有 SKILL.md）—— 只装插件，不注册 skill 根"
 }
 
 # ------------------------------------------------------------------ 4. verify
@@ -320,7 +331,7 @@ $check = [System.IO.File]::ReadAllText($profileJson, [System.Text.Encoding]::UTF
 if (@($check.dsh.profile.bundles) -notcontains $pluginName) { throw "verification failed: '$pluginName' not in dsh.profile.bundles" }
 if (-not $check.dependencies.PSObject.Properties[$pluginName]) { throw "verification failed: dependency '$pluginName' missing" }
 $patchText = if (Test-Path $patchFile) { [System.IO.File]::ReadAllText($patchFile, [System.Text.Encoding]::UTF8) } else { '' }
-if ($SkillDir -and (Test-Path $SkillDir)) {
+if ($skillName -and (Test-Path $SkillDir)) {
   if ($patchText -notmatch [regex]::Escape($SkillDir)) { throw "verification failed: skill root '$SkillDir' not registered in $patchFile" }
   if (-not (Test-Path (Join-Path $SkillDir "$skillName\SKILL.md"))) { throw "verification failed: $skillName\SKILL.md missing under $SkillDir" }
   Write-Host "skill root registered: $SkillDir" -ForegroundColor Green

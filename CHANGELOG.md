@@ -13,7 +13,7 @@
 - **双指缩放**：每根手指独立 DOWN/UP，相册类应用实测 400px → 600px（×1.5）
 - **截屏 / 长截图**：逐帧采集 + 行剖面运动估计 + 增量拼接，实测 1080×5147 无缝无重复
 - **12 个模型工具**：`phone_status` `phone_apps` `phone_open` `phone_screenshot` `phone_longshot` `phone_inspect` `phone_action` `phone_keyboard` `phone_clipboard` `phone_stream` `phone_preset` `phone_takeover`
-- **京东 skill**：`skills/jd-mall-capture`，搜索关键字 → 店铺 tab → 进店 → 店铺首页长截图
+- **京东 skill**：`skills/jd-shop-longshot`，搜索关键字 → 店铺 tab → 进店 → 店铺首页长截图
 - **控制权模型**：AI 优先，人可一键强抢，静默 90s 自动交还
 
 ### 修复（相对 0.x）
