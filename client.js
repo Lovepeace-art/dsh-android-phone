@@ -1304,6 +1304,14 @@ window.__ModuleLoader__.load({
         onClick: () => (capturing ? stopLong() : onShot()),
       }, capLabel);
 
+      // 设置按钮（用户 2026-10-19：从第二行工具行挪到顶栏，放在画质后面）
+      const settingsBtn = h('button', {
+        style: { ...S.btn, ...(showSettings ? S.btnOk : null) },
+        'data-settings': showSettings ? '1' : '0',
+        title: '设置：截图保存地址 / 自动清理 / skill 位置 / 打开 App 候选',
+        onClick: () => setShowSettings((v) => !v),
+      }, '⚙ 设置');
+
       // 顶栏（用户 2026-10-17 重排）：连接 / 控制权 / 分辨率 + 画面模式 + 暂停 + 画质
       // 第二行：截图（挪到京东前）+ 打开京东 + 返回 / 桌面 / 多任务
       const rows = [
@@ -1327,6 +1335,7 @@ window.__ModuleLoader__.load({
             title: '画质档位',
             onChange: (e) => setQuality(e.target.value),
           }, Object.keys(QUALITY).map((k) => h('option', { key: k, value: k, title: QUALITY[k].full }, QUALITY[k].label))),
+          settingsBtn,
         ),
         h('div', { key: 'bar1', style: S.bar },
           captureBtn,
@@ -1348,12 +1357,6 @@ window.__ModuleLoader__.load({
           h('button', { style: S.btn, onClick: () => act({ action: 'key', key: 'BACK' }, '返回') }, '◀ 返回'),
           h('button', { style: S.btn, onClick: () => act({ action: 'home' }, '桌面') }, '⌂ 桌面'),
           h('button', { style: S.btn, 'data-recents': '1', onClick: () => act({ action: 'key', key: 'APP_SWITCH' }, '多任务') }, '🗂 多任务'),
-          h('button', {
-            style: { ...S.btn, ...(showSettings ? S.btnOk : null) },
-            'data-settings': showSettings ? '1' : '0',
-            title: '设置：截图保存地址 / 自动清理 / skill 位置',
-            onClick: () => setShowSettings((v) => !v),
-          }, '⚙ 设置'),
         ),
       ];
 

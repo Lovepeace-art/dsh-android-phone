@@ -559,6 +559,23 @@ check('第二行：截图按钮排在「▶ 打开」前面，且「▶ 打开�
     return iShot >= 0 && iOpen > iShot && !!bar1Row.querySelector('select[data-launch-pkg]');
   })(), bar1Row ? bar1Row.textContent.slice(0, 90) : '没有第二行');
 
+// 2026-10-19 用户要求：设置按钮从第二行工具行挪到顶栏、放在画质后面
+const setBtn = devRow ? devRow.querySelector('[data-settings]') : null;
+check('设置按钮在顶栏、且排在画质下拉之后（从第二行挪上来）',
+  !!setBtn && (() => {
+    const kids = Array.from(devRow.children);
+    const q = devRow.querySelector('select[data-quality]');
+    const iQ = kids.indexOf(q);
+    const iS = kids.indexOf(setBtn);
+    return iQ >= 0 && iS > iQ;
+  })(),
+  setBtn
+    ? `设置按钮=第 ${Array.from(devRow.children).indexOf(setBtn) + 1} 个子节点，画质=第 ${Array.from(devRow.children).indexOf(devRow.querySelector('select[data-quality]')) + 1} 个`
+    : '顶栏没有设置按钮');
+check('第二行工具行不再有设置按钮',
+  !!bar1Row && !bar1Row.querySelector('[data-settings]'),
+  bar1Row ? bar1Row.textContent.slice(0, 90) : '没有第二行');
+
 const pauseBtn = container.querySelector('button[data-pause]');
 check('顶栏有暂停按钮（原来浮在画面右下角的按钮已挪到顶栏）',
   pauseBtn?.getAttribute('data-pause') === '0' && /暂停/.test(pauseBtn.textContent),
