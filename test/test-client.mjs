@@ -114,7 +114,8 @@ function makeFetchStub(record) {
       });
     }
     if (u.includes('/longshot')) return json({ ok: true, running: false, height: 8800, frames: 3, ms: 4000, result: { path: 'C:\\shots\\x-long.png', width: 1080, height: 8800, bytes: 456, quality: { ok: true } } });
-    if (u.includes('/takeover')) return json({ ok: true, owner: 'human', humanHoldMs: 90000 });
+if (u.includes('/takeover')) return json({ ok: true, owner: 'human', humanHoldMs: 60000 });
+if (u.includes('/owner')) return json({ ok: true, owner: 'ai', humanHoldMs: 60000 });
     if (u.endsWith('/owner')) return json({ ok: true, owner: body?.owner === 'ai' ? 'ai' : 'human', humanHoldMs: 90000 });
     if (u.includes('/shot')) return json({ ok: true, path: `C:\\shots\\x-${body?.mode}.png`, width: 1080, height: body?.mode === 'long' ? 8800 : 2400, bytes: 123, mode: body?.mode === 'long' ? 'stitched' : 'single', quality: body?.mode === 'long' ? { ok: true } : undefined });
     if (u.includes('/snapshot')) return json({ ok: true }, 200);
@@ -539,17 +540,26 @@ check('状态行不再显示「前台 xxx」（2026-10-19 用户要求删掉）'
 
 const ownerPill = container.querySelector('[data-owner]');
 const owner0 = ownerPill?.getAttribute('data-owner');
-check('控制权胶囊固定为绿色「模型持有」（2026-10-17 用户要求：人操控时不变色、不可点）',
-  !!ownerPill && /模型持有/.test(ownerPill.textContent) && !/人在操作/.test(ownerPill.textContent) && !ownerPill.onclick,
+check('控制权胶囊文案固定「模型持有」，只随持有者变色',
+  !!ownerPill && /模型持有/.test(ownerPill.textContent),
   ownerPill ? `${ownerPill.textContent} data-owner=${owner0}` : '没有胶囊');
-if (ownerPill) {
+if (ownerPill && owner0 === 'human') {
+  check('人已接管时胶囊是按钮（相当于「交还」入口）', ownerPill.tagName === 'BUTTON', ownerPill.tagName);
   calls.length = 0;
   ownerPill.dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
   for (let i = 0; i < 3; i += 1) { await new Promise((r) => setTimeout(r, 20)); await flush(); }
-  check('点控制权胶囊不再切换持有者、也不再发 /takeover 或 /owner',
-    container.querySelector('[data-owner]')?.getAttribute('data-owner') === owner0
-      && !calls.some((c) => c.url.endsWith('/takeover') || c.url.endsWith('/owner')),
-    container.querySelector('[data-owner]')?.getAttribute('data-owner'));
+  const back = container.querySelector('[data-owner]');
+  const ownerReq = calls.find((c) => String(c.url || '').includes('/owner'));
+  check('点胶囊 → POST /owner 并回到「模型持有」',
+    !!ownerReq && back?.getAttribute('data-owner') === 'ai',
+    `${ownerReq ? ownerReq.url : '没发 /owner'} -> ${back?.getAttribute('data-owner')}`);
+} else if (ownerPill) {
+  check('模型持有时胶囊不可点（span、无 onClick）', ownerPill.tagName === 'SPAN' && !ownerPill.onclick, ownerPill.tagName);
+  calls.length = 0;
+  ownerPill.dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
+  for (let i = 0; i < 3; i += 1) { await new Promise((r) => setTimeout(r, 20)); await flush(); }
+  check('模型持有时点胶囊不发 /takeover 或 /owner',
+    !calls.some((c) => c.url.endsWith('/takeover') || c.url.endsWith('/owner')), '');
 }
 
 const devRow = container.querySelectorAll('[data-font] > div')[0];

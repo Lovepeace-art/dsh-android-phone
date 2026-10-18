@@ -7,9 +7,9 @@
  *  - scrcpy 视频流与另一个 QtScrcpy 窗口互斥，多开会话只会打架。
  *
  * 所有权模型（用户原话：ai 使用时宿主只观看，ai 暂停时宿主可操作，宿主有强制操作的权限）：
- *  - owner = 'ai'（默认）：模型可操作；侧栏只读（客户端禁用手势，但点「接管」可强抢）；
- *  - owner = 'human'：人被 AI 操作打扰时点「接管」强抢；此后模型的 phone_* 动作会被拒绝，
- *    直到人点「交还」或模型调用 phone_takeover 拿回；
+ *  - owner = 'ai'（默认）：模型可操作；人**碰一下画面**即自动接管；
+ *  - owner = 'human'：模型的 phone_* 动作会被拒绝，直到人**点顶栏灰色胶囊**交还、或模型调用
+ *    phone_takeover 拿回、或静默 humanHoldMs（60 秒）自动交还；
  *  - 任何人/模型的操作都会刷新 lastActivity，会话空闲（无订阅者 && 无操作）到 idleStopMs 才自动停。
  *
  * 崩溃自愈：server 进程意外退出（历史上正向模式 2~4 秒静默退出就是这么暴露的）时，
@@ -22,7 +22,7 @@ import { pickDevice, screenMetrics } from './adb.js';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const DEFAULT_IDLE_STOP_MS = 45_000;
-const DEFAULT_HUMAN_HOLD_MS = 90_000;   // 人抢到控制权后，静默这么久自动交还模型
+const DEFAULT_HUMAN_HOLD_MS = 60_000;   // 人抢到控制权后，静默这么久自动交还模型
 
 let cur = null;               // { video, ctl, serial, metrics, opts, startedAt, subscribers:Set, restarts }
 let starting = null;
@@ -88,7 +88,7 @@ export function setOwner(next, { by = 'human', reason = '', holdMs = null } = {}
 /** 模型侧动作的守门人：人被抢了控制权就拒绝（人可强抢，模型不能硬闯）。 */
 export function assertAiAllowed() {
   if (owner === 'human') {
-    const err = new Error('手机控制权已被人工接管（owner=human）：请先让用户在侧栏点「交还」，或调用 phone_takeover 拿回控制权后再操作');
+      const err = new Error('手机控制权已被人工接管（owner=human）：请让用户点侧栏顶栏的灰色控制权胶囊交还，或调用 phone_takeover 拿回控制权后再操作');
     err.code = 'OWNER_HUMAN';
     throw err;
   }

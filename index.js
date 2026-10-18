@@ -1041,7 +1041,7 @@ function buildToolDefs(ctx, cfg, state, log) {
 
   push({
     name: 'phone_takeover',
-    description: '控制权交接。owner="human" 时人接管（模型的动作会被拒绝，适合人自己上手改脚本/改配置）；owner="ai" 时把控制权交还模型继续跑。人停止操作一段时间后也会自动交还（默认 90s，可用 idleMs 调整）。',
+        description: '控制权交接。owner="human" 时人接管（模型的动作会被拒绝，适合人自己上手改脚本/改配置）；owner="ai" 时把控制权交还模型继续跑。人静默 60 秒后会自动交还（可用 idleMs 调整）；人在侧栏也可直接点顶栏灰色胶囊交还。',
     parameters: {
       type: 'object',
       properties: {

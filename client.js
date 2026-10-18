@@ -1281,14 +1281,32 @@ window.__ModuleLoader__.load({
         onClick: () => { if (link && linkState !== 'ok') pushNotice(`${link.message || '连接异常'}${link.hint ? `：${link.hint}` : ''}`); },
       }, linkText);
 
-      // 控制权胶囊（用户 2026-10-18）：文案固定「模型持有」，只有颜色随持有者变 ——
-      // 模型持有 = 绿；非模型持有（人已接管）= 默认灰。不做点击交互。
-      const ownerPill = h('span', {
-        style: { ...S.pill, ...(owner === 'ai' ? S.pillOk : null) },
+      // 控制权胶囊（用户 2026-10-19）：文案固定「🤖 模型持有」，颜色随持有者变 ——
+      // 绿 = 模型持有（不可点）；灰 = 人已接管，**点一下即交还模型**（相当于以前的「↩ 交还」按钮）。
+      const giveBack = async () => {
+        if (ownerRef.current !== 'human') return;
+        try {
+          const j = await getJson('/owner', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ owner: 'ai', reason: '侧栏点控制权胶囊交还' }),
+          });
+          const next = j?.owner || 'ai';
+          ownerRef.current = next;
+          setOwner(next);
+          setNotice('已交还给模型');
+        } catch (e) { setNotice(`交还失败：${e.message}`); }
+      };
+      const ownerPill = h(owner === 'human' ? 'button' : 'span', {
+        style: {
+          ...S.pill,
+          ...(owner === 'ai' ? S.pillOk : null),
+          ...(owner === 'human' ? { cursor: 'pointer', fontFamily: 'inherit' } : null),
+        },
         'data-owner': owner,
         title: owner === 'ai'
-          ? '模型持有控制权（人点画面会自动接管，静默 90s 自动交还）'
-          : '人已接管控制权（模型的动作会被拒绝，静默 90s 自动交还）',
+          ? '模型持有控制权（人碰画面会自动接管；人静默 60 秒后自动交还）'
+          : '人已接管控制权：模型的动作会被拒绝。点这里交还模型（静默 60 秒也会自动交还）',
+        ...(owner === 'human' ? { onClick: () => { void giveBack(); } } : null),
       }, '🤖 模型持有');
 
       // 悬停只给「型号 + 系统」（用户 2026-10-17：信息太多）。编码尺寸挪到底部状态行。
