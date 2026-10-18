@@ -131,6 +131,9 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // ---------------- 设置（侧栏「⚙ 设置」页；落盘 ~/.dsh/android-phone/settings.json） ----------------
 // 只放「用户可改」的少量项。优先级：设置文件 > 插件 config > 环境变量 > 默认。
+// 哪些接口带 human:true 时要把控制权记到人头上（会驱动手机的那些；只读接口不算）
+const HUMAN_CLAIM_ROUTES = new Set(['action', 'keyboard', 'clipboard', 'open', 'shot']);
+
 const SETTINGS_CLEANUP_CHOICES = ['off', '1', '3', '7', '30'];   // off / 保留 N 天
 // 工具栏「▶ 打开」下拉的候选。用户 2026-10-18：候选 App 由用户自己配置，默认给这 6 个。
 const SETTINGS_DEFAULT_APPS = [
@@ -1314,6 +1317,12 @@ export function apply(ctx, config = {}) {
 
     if (method === 'POST') {
       const args = await readJson(req);
+      // 统一口径：请求带 human:true 就是「人在操作手机」，控制权一律记到人头上。
+      // 侧栏点按/拖拽/滚轮/键盘/粘贴/打开 App 都走这里，不再依赖 client 先发一次 /takeover。
+      // 只对会驱动手机的接口生效：/session 的 status 轮询也带 human:true，那不算操作。
+      if (args.human === true && HUMAN_CLAIM_ROUTES.has(route) && getOwner() !== 'human') {
+        setOwner('human', { by: 'human', reason: `侧栏操作（${route}）` });
+      }
       const tools = buildToolset();
       const call = async (name, a) => {
         const t = tools.find((x) => x.name === name);

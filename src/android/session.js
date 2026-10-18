@@ -19,12 +19,15 @@ import { startVideoStream, resolveServerJar } from './video.js';
 import { createControlChannel } from './control.js';
 import { pickDevice, screenMetrics } from './adb.js';
 
+import { detectTouchDevice, startTouchWatch } from './touchWatch.js';
+
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const DEFAULT_IDLE_STOP_MS = 45_000;
 const DEFAULT_HUMAN_HOLD_MS = 60_000;   // 人抢到控制权后，静默这么久自动交还模型
 
-let cur = null;               // { video, ctl, serial, metrics, opts, startedAt, subscribers:Set, restarts }
+let cur = null;
+let touchWatch = null;            // 真机触摸监听：人手碰玻璃 → 自动接管（getevent 只看内核事件）               // { video, ctl, serial, metrics, opts, startedAt, subscribers:Set, restarts }
 let starting = null;
 let owner = 'ai';
 let ownerAt = Date.now();
@@ -56,7 +59,12 @@ export function idleForMs() { return Date.now() - lastActivity; }
 /* ---------------------------------------------------------------- 所有权 */
 
 export function getOwner() { return owner; }
-export function ownerInfo() { return { owner, ownerAt, idleMs: idleForMs(), humanHoldMs: cfgRef.humanHoldMs }; }
+export function ownerInfo() {
+  return {
+    owner, ownerAt, idleMs: idleForMs(), humanHoldMs: cfgRef.humanHoldMs,
+    humanTouch: touchWatch ? { device: touchWatch.device, running: touchWatch.running } : null,
+  };
+}
 
 /** 人接管是有租约的：静默超过 humanHoldMs 就自动交还模型，免得模型一直撞「已被人工接管」 */
 function armOwnerLease() {
@@ -95,6 +103,38 @@ export function assertAiAllowed() {
   touchActivity();
 }
 
+/* ---------------------------------------------------------- 真机触摸监听 */
+
+function stopHumanTouchWatch() {
+  if (!touchWatch) return;
+  try { touchWatch.stop(); } catch { /* ignore */ }
+  touchWatch = null;
+}
+
+/** 人在手机本体上操作（不是侧栏点鼠标）时，同样把控制权交给真人。 */
+function armHumanTouchWatch({ serial, adbPath, metrics, log }) {
+  if (process.env.DSH_PHONE_NO_TOUCH_WATCH === '1') return;
+  detectTouchDevice(serial, { adbPath, screen: metrics })
+    .then((dev) => {
+      if (!cur) return;                                   // 会话已经停了，不用挂监听
+      if (!dev) { log('[touch] 没找到触摸屏设备，真机操作不会自动接管（不影响其它功能）'); return; }
+      stopHumanTouchWatch();
+      touchWatch = startTouchWatch({
+        serial, adbPath, device: dev.device, log,
+        onTouch: () => {
+          if (owner !== 'human') {
+            log('[touch] 检测到真机触摸，控制权交给真人');
+            setOwner('human', { by: 'phone-touch', reason: '真机触摸' });
+          } else {
+            touchActivity();                              // 人一直在动手机 → 续租
+          }
+          emit('human-touch', { at: Date.now() });
+        },
+      });
+      log(`[touch] 监听 ${dev.device} ${dev.name || ''}（真机操作会自动接管控制权）`);
+    })
+    .catch((e) => log(`[touch] 启动真机触摸监听失败：${e.message}`));
+}
 /* ---------------------------------------------------------------- 会话 */
 
 export function sessionInfo() {
@@ -268,6 +308,7 @@ export async function ensureSession(opts = {}) {
         cfgRef.log('[session] 连续退出 3 次，不再自动重启（请看 PROGRESS.md 坑 8 的排查记录）');
       }
     });
+    armHumanTouchWatch({ serial, adbPath, metrics, log });
     emit('start', sessionInfo());
     scheduleIdleCheck();
     return video;
@@ -280,6 +321,7 @@ export async function stopSession(reason = '') {
   const c = cur;
   if (!c) return { ok: true };
   cur = null;
+  stopHumanTouchWatch();
   stopping = (async () => {
     for (const s of [...c.subscribers]) { try { s.end?.(); } catch { /* ignore */ } }
     c.subscribers.clear();
