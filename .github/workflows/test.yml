@@ -13,8 +13,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
-        node: [20, 22]
+        # 只跑 Windows：package.json 声明了 "os": ["win32"]（插件用 install.ps1 装进
+        # DSH desktop profile，vendor 里是 adb.exe / AdbWinApi.dll，本来就只有 Windows 版），
+        # 在 linux runner 上 `npm install` 会直接 EBADPLATFORM 退出，跑了也没有意义。
+        os: [windows-latest]
+        # 只跑 22 / 24：测试依赖 jsdom 依赖的 undici 需要 zlib.createZstdDecompress，
+        # 那是 Node 22.15+ 才有的 API，Node 20 上 jsdom 加载即失败。
+        # （插件的运行时代码本身零 npm 依赖，Node ≥ 20 即可。）
+        node: [22, 24]
     steps:
       - uses: actions/checkout@v4
 

@@ -162,7 +162,8 @@ npm test         # 离线回归：不需要手机、不需要 DSH、不需要浏
 
 - 报告写到 `test/reports/`（已 gitignore）。
 - 真机测试会占用手机：`test-e2e-jd` 会打开京东、搜索、进店铺、跑长截图；跑之前请把手机放一边。
-- CI 见 `.github/workflows/test.yml`：push / PR 时在 ubuntu + windows × node 20/22 上跑 `npm test`。
+- 跑测试需要 **Node ≥ 22.15**：`jsdom` 依赖的 `undici` 用到 `zlib.createZstdDecompress`，Node 20 上加载即失败。插件运行时本身零 npm 依赖，Node ≥ 20 即可。
+- CI 见 `.github/workflows/test.yml`：push / PR 时在 **windows × node 22/24** 上跑 `npm test`。只跑 Windows 是因为 `package.json` 声明了 `os: ["win32"]`（插件靠 `install.ps1` + `adb.exe` 装进 DSH desktop profile），linux runner 上 `npm install` 会直接 `EBADPLATFORM` 退出。
 
 ## 已知限制
 

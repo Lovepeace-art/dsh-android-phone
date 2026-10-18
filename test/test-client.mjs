@@ -39,6 +39,11 @@ for (const [name, take] of deps) {
     console.error(`  解析目录: ${MODULES}`);
     console.error(`  node: ${process.version} / ${process.platform}`);
     console.error(`  ${stack}`);
+    const major = Number(process.versions.node.split('.')[0]);
+    if (major < 22) {
+      console.error('  ⚠ 测试依赖 jsdom 依赖 undici，后者需要 Node 22.15+ 的 zlib.createZstdDecompress；');
+      console.error('    请用 Node 22.15+ 跑测试（插件的运行时代码本身零 npm 依赖，Node ≥ 20 即可）。');
+    }
     console.error('\n请先 npm install，或用 CLIENT_TEST_MODULES 指向有这些包的 node_modules 目录');
     process.exit(2);
   }
