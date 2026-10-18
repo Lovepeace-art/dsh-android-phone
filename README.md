@@ -42,7 +42,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\install.ps1
 ... -Uninstall    # 卸载
 ```
 
-脚本做四件事：包 junction 到 `<profile>\node_modules\dsh-android-phone`、名字加进 `dsh.profile.bundles`、`dependencies` 声明 `link:<相对路径>`、把 `skills/` 并进 profile 的 skill 根。
+脚本做四件事：包 junction 到 `<profile>\node_modules\dsh-android-phone`、名字加进 `dsh.profile.bundles`、`dependencies` 声明 `link:<相对路径>`、把 `skills/` **同步一份**到 `<profile>\vendor\dsh-android-phone\skills` 并登记成 skill 根。
 
 - 官方 `dsh plugin add` 会拒绝 desktop profile（"managed exclusively by the Electron application"），所以安装由脚本自己做。
 - ⚠️ `install.ps1` 必须保持 **UTF-8 BOM**：Windows PowerShell 5.1 读无 BOM 的 `.ps1` 会按 ANSI 解码，中文变乱码并报一堆假的 `Missing closing '}'`。
@@ -102,6 +102,10 @@ node skills/jd-shop-longshot/scripts/jd-shop-longshot.mjs --keyword 牛奶 --sho
 ```
 
 `skills/` 只是约定位置：插件能力不依赖任何 skill。删掉自带的 skill（只留 `skills/README.md`）安装照样成功，只是不注册 skill 根。
+
+> 注册的是 **profile 里的副本**，不是仓库路径 —— 所以仓库搬家/删除都不会让技能静默消失。
+> 代价：改完 `skills/` 里的东西要重跑一次 `npm run install:profile`，再重启 DSH。
+> 跟别的 skill 根重名时会自动改名成 `<name>-2`（同时改 `SKILL.md` 的 `name:`），不会互相覆盖。
 
 ## 工作原理
 

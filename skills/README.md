@@ -9,8 +9,13 @@ skills/
    └─ scripts/          # 可选：配套脚本
 ```
 
-安装时 `install.ps1` 会把 **`<插件目录>\skills`** 并进 profile 的
-`skill-filesystem` → `customSkillDirs`，所以放进来就会被 DSH 发现（改完要重启 DSH）。
+安装时 `install.ps1` 会把 **`<插件目录>\skills` 同步一份**到 profile 的
+`<profile>\vendor\dsh-android-phone\skills`，再登记进
+`skill-filesystem` → `customSkillDirs`，所以放进来就会被 DSH 发现。
+
+- 注册的是 **profile 里的副本**：仓库搬家/删除都不影响技能
+- 改完要**重跑一次 `npm run install:profile`**（重新同步），再重启 DSH
+- 跟别的 skill 根重名会自动改名成 `<name>-2` 并同步改 `SKILL.md` 的 `name:`
 
 ## 这个目录可以是空的
 

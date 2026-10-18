@@ -86,15 +86,101 @@ if ($existing -and -not $existing.LinkType) {
 # **必须在已有条目里加一项**，不能新加一条 `- id: skill-filesystem` —— 同 id 多条目时
 # 后者会覆盖前者，会把别的插件（如 dsh-sanjip-ops）注册的技能根整个抹掉。
 # 技能名不写死：插件包可以完全不带 skill（公共仓库只保留 skills\ 目录），也可以放任意多个
-# 自己的 skill。这里动态取第一个带 SKILL.md 的子目录名；没有就跳过 skill 根接线。
-function Get-BundledSkillName {
-  param([string]$SkillsDir)
-  if (-not (Test-Path -LiteralPath $SkillsDir)) { return $null }
-  $hit = Get-ChildItem -LiteralPath $SkillsDir -Directory -ErrorAction SilentlyContinue |
-    Where-Object { Test-Path -LiteralPath (Join-Path $_.FullName 'SKILL.md') } |
-    Select-Object -First 1
-  if ($hit) { return $hit.Name }
-  return $null
+# 自己的 skill。这里把 skills\* 全部同步进 profile，并自动处理重名。
+#
+# 为什么同步一份到 profile、而不是直接注册仓库路径：
+#   profile 里记的是绝对路径，仓库一搬家 skill 就静默消失（用户毫无提示）。同步到
+#   <profile>\vendor\<plugin>\skills 后 profile 自带技能，仓库删了/搬了都不影响。
+#   代价：改完 skill 要重跑一次安装（技能列表还要重启 DSH 才刷）。
+
+function Get-OtherSkillNames {
+  # 收集「别的 skill 根」里已有的 skill 名（大小写不敏感），用于重名去重。
+  param([string]$PatchFile, [string]$Self, [string]$ProfileDir, [string[]]$Ignore)
+
+  $taken = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
+  $roots = New-Object 'System.Collections.Generic.List[string]'
+
+  # ① profile 里登记过的其它 skill 根
+  if (Test-Path -LiteralPath $PatchFile) {
+    $text = [System.IO.File]::ReadAllText($PatchFile, [System.Text.Encoding]::UTF8)
+    foreach ($m in [regex]::Matches($text, "(?m)^\s*-\s*['""]?([A-Za-z]:[\\/][^'""\r\n]*)['""]?\s*$")) {
+      $roots.Add($m.Groups[1].Value.Trim())
+    }
+  }
+  # ② 默认用户根 <dsh>\skills
+  #    注意：$ProfileDir 可能带结尾反斜杠，Split-Path -Parent 对带尾斜杠的路径只去掉斜杠、
+  #    不往上走一层 —— 必须先 TrimEnd，否则 dshHome 会算成 <dsh>\profiles。
+  $pd = ''
+  if ($ProfileDir) { $pd = $ProfileDir.TrimEnd('\', '/') }
+  if ($pd) {
+    $dshHome = Split-Path -Parent (Split-Path -Parent $pd)
+    if ($dshHome) { $roots.Add((Join-Path $dshHome 'skills')) }
+    # ③ 本 profile 里其它插件铺的技能（含我们自己上次铺的那份，下面按 Ignore 排除）
+    $vendorRoot = Join-Path $pd 'vendor'
+    if (Test-Path -LiteralPath $vendorRoot) {
+      Get-ChildItem -LiteralPath $vendorRoot -Directory -ErrorAction SilentlyContinue | ForEach-Object {
+        $roots.Add((Join-Path $_.FullName 'skills'))
+      }
+    }
+  }
+
+  $selfNorm = if ($Self) { $Self.TrimEnd('\', '/') } else { '' }
+  $ignoreNorm = @()
+  foreach ($ig in @($Ignore)) { if ($ig) { $ignoreNorm += $ig.TrimEnd('\', '/') } }
+
+  foreach ($r in $roots) {
+    if (-not $r) { continue }
+    if (-not (Test-Path -LiteralPath $r)) { continue }
+    $norm = $r.TrimEnd('\', '/')
+    if ($selfNorm -and $norm -eq $selfNorm) { continue }
+    if ($ignoreNorm -contains $norm) { continue }
+    Get-ChildItem -LiteralPath $r -Directory -ErrorAction SilentlyContinue | ForEach-Object {
+      if (Test-Path -LiteralPath (Join-Path $_.FullName 'SKILL.md')) { [void]$taken.Add($_.Name) }
+    }
+  }
+  return ,$taken
+}
+
+function Sync-Skills {
+  # 把 <包>\skills\* 同步到 $SkillRoot；跟别的根重名的自动加 -2 / -3 序号（同时改 frontmatter 的 name）。
+  # 返回最终注册的 skill 名数组。
+  param([string]$Source, [string]$SkillRoot, [string]$PatchFile, [string]$ProfileDir, [switch]$AlreadyCopied)
+
+  $names = @()
+  if (-not (Test-Path -LiteralPath $Source)) { return $names }
+
+  if (-not $AlreadyCopied) {
+    if (Test-Path -LiteralPath $SkillRoot) { Remove-Item -LiteralPath $SkillRoot -Recurse -Force }
+    New-Item -ItemType Directory -Force -Path $SkillRoot | Out-Null
+    Copy-Item -Path (Join-Path $Source '*') -Destination $SkillRoot -Recurse -Force
+  }
+  if (-not (Test-Path -LiteralPath $SkillRoot)) { return $names }
+
+  # 忽略「本次要注册的目标根」和「包自己的 skills 目录」：
+  # 上一版安装可能把包路径也登记在 profile 里，不排除的话会把自己当成重名，
+  # 首次安装就把 jd-shop-longshot 改成 jd-shop-longshot-2。
+  $taken = Get-OtherSkillNames -PatchFile $PatchFile -Self $SkillRoot -ProfileDir $ProfileDir `
+             -Ignore @($SkillRoot, $Source)
+
+  $enc8 = New-Object System.Text.UTF8Encoding($false)
+  foreach ($d in @(Get-ChildItem -LiteralPath $SkillRoot -Directory -ErrorAction SilentlyContinue)) {
+    if (-not (Test-Path -LiteralPath (Join-Path $d.FullName 'SKILL.md'))) { continue }
+    $base = $d.Name
+    $name = $base
+    $n = 1
+    while ($taken.Contains($name)) { $n++; $name = "$base-$n" }
+    if ($name -ne $base) {
+      Rename-Item -LiteralPath $d.FullName -NewName $name
+      $md = Join-Path $SkillRoot (Join-Path $name 'SKILL.md')
+      $t = [System.IO.File]::ReadAllText($md, [System.Text.Encoding]::UTF8)
+      $t = [regex]::Replace($t, '(?m)^name:\s*.*$', "name: $name", 1)
+      [System.IO.File]::WriteAllText($md, $t, $enc8)
+      Write-Host "skill 重名：$base -> $name（别的 skill 根里已有同名 skill）"
+    }
+    [void]$taken.Add($name)
+    $names += $name
+  }
+  return $names
 }
 
 function Update-SkillRoot {
@@ -247,8 +333,9 @@ if ($WhatIfOnly) {
   Write-Host "[what-if] would link    : $linkPath -> $(if ($Copy) { $vendorPath } else { $Source })"
   Write-Host "[what-if] would add     : '$pluginName' to dsh.profile.bundles"
   Write-Host "[what-if] would declare : dependencies['$pluginName']"
+  Write-Host "[what-if] would sync skills to: $(Join-Path $vendorPath 'skills')"
   Write-Host "[what-if] would add skill root to $patchFile :"
-  Write-Host "                       $(Join-Path $(if ($Copy) { $vendorPath } else { $Source }) 'skills')"
+  Write-Host "                       $(Join-Path $vendorPath 'skills')"
   return
 }
 
@@ -312,13 +399,16 @@ if ($changed) {
 [System.IO.File]::ReadAllText($profileJson, [System.Text.Encoding]::UTF8) | ConvertFrom-Json | Out-Null   # prove it still parses
 Write-Host 'profile manifest is valid JSON'
 
-# --------------------------------------------------- 3b. 注册 skill 根（技能随插件走）
-$skillDir = Join-Path $target 'skills'
-$skillName = Get-BundledSkillName $skillDir
-if ($skillName) {
-  Update-SkillRoot -File $patchFile -Dir $skillDir
+# --------------------------------------------------- 3b. 同步 + 注册 skill 根（技能随插件走）
+# 注册的是 profile 里的副本（<profile>\vendor\<plugin>\skills），不是仓库路径 —— 原因见上面注释。
+$skillSrc = Join-Path $Source 'skills'
+$skillRoot = Join-Path $vendorPath 'skills'
+$skillNames = @(Sync-Skills -Source $skillSrc -SkillRoot $skillRoot -PatchFile $patchFile -ProfileDir $ProfileDir -AlreadyCopied:$Copy)
+if ($skillNames.Count -gt 0) {
+  Update-SkillRoot -File $patchFile -Dir $skillRoot
+  Write-Host "skills 已同步到 $skillRoot : $($skillNames -join ', ')"
 } else {
-  Write-Host "插件包没自带 skill（$skillDir 下没有 SKILL.md）—— 只装插件，不注册 skill 根"
+  Write-Host "插件包没自带 skill（$skillSrc 下没有 SKILL.md）—— 只装插件，不注册 skill 根"
 }
 
 # ------------------------------------------------------------------ 4. verify
@@ -331,10 +421,13 @@ $check = [System.IO.File]::ReadAllText($profileJson, [System.Text.Encoding]::UTF
 if (@($check.dsh.profile.bundles) -notcontains $pluginName) { throw "verification failed: '$pluginName' not in dsh.profile.bundles" }
 if (-not $check.dependencies.PSObject.Properties[$pluginName]) { throw "verification failed: dependency '$pluginName' missing" }
 $patchText = if (Test-Path $patchFile) { [System.IO.File]::ReadAllText($patchFile, [System.Text.Encoding]::UTF8) } else { '' }
-if ($skillName -and (Test-Path $SkillDir)) {
-  if ($patchText -notmatch [regex]::Escape($SkillDir)) { throw "verification failed: skill root '$SkillDir' not registered in $patchFile" }
-  if (-not (Test-Path (Join-Path $SkillDir "$skillName\SKILL.md"))) { throw "verification failed: $skillName\SKILL.md missing under $SkillDir" }
-  Write-Host "skill root registered: $SkillDir" -ForegroundColor Green
+if ($skillNames.Count -gt 0) {
+  if ($patchText -notmatch [regex]::Escape($skillRoot)) { throw "verification failed: skill root '$skillRoot' not registered in $patchFile" }
+  foreach ($sn in $skillNames) {
+    if (-not (Test-Path (Join-Path $skillRoot "$sn\SKILL.md"))) { throw "verification failed: $sn\SKILL.md missing under $skillRoot" }
+  }
+  if ($patchText -match [regex]::Escape($Source)) { Write-Warning "profile 里还残留仓库路径 $Source —— 检查 cordis.patch.yml" }
+  Write-Host "skill root registered: $skillRoot ($($skillNames -join ', '))" -ForegroundColor Green
 }
 $skillCount = ([regex]::Matches($patchText, '(?m)^\s*customSkillDirs:\s*$')).Count +
               ([regex]::Matches($patchText, '(?m)^\s*customSkillDirs:\s*\[')).Count
