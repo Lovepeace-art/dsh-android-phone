@@ -31,6 +31,10 @@
 3. 安装（DSH 用自带 pnpm 完成依赖与注册）
 4. **重启 DSH**
 
+也可以走 CLI（与上面等价，agent 代劳时用这条）：
+`dsh plugin --profile desktop add "link:<插件绝对路径>"` —— 它会把依赖、`node_modules` 链接和
+`dsh.profile.bundles` 注册一次做完；`dsh` 不在 PATH 时一般在 `<DSH 安装目录>\resources\runtime\cli\bin\dsh.cmd`。
+
 装完插件会出现在 DSH 的「插件」页（可在这里开关与配置）；装了 better-sidebar 时侧栏还会多出「手机」tab。
 
 > 目前**没有发布到 npm**，所以「填包名」那条路暂时走不通 —— 用本地路径或 Git 地址。
@@ -38,12 +42,16 @@
 
 ### 让 agent 帮你装
 
-把下面这段发给模型即可：
+把下面这段发给模型即可（需要它能在本机执行命令）：
 
 > 在这台 Windows 机器上安装 DSH 插件 `dsh-android-phone`，插件目录是 `<填你克隆出来的绝对路径>`。
-> 请用 DSH 的插件安装入口安装它（设置 → 插件 → 添加插件 → 本地路径），然后重启 DSH。
-> 装完执行 `npm run doctor` 确认自检全绿，有 ❌ 按提示修（缺 adb、手机没连、profile 未注册）。
-> 最后告诉我结论，以及需要「重启 DSH」还是「刷新侧栏」。不要修改仓库里的代码文件。
+> 不要点界面，用 CLI 装（与 DSH「设置 → 插件 → 添加插件 → 本地路径」等价）：
+> 1. 找 DSH 自带 CLI `dsh`；不在 PATH 时一般在 `<DSH 安装目录>\resources\runtime\cli\bin\dsh.cmd`。
+> 2. 跑 `dsh plugin --profile desktop add "link:<插件绝对路径>"`（profile 用我正在用的那个，未必叫 desktop）。
+> 3. 重启 DSH。
+> 装完在插件目录跑 `node scripts/doctor.mjs`（零依赖，不需要 npm install），必须 10/10 全绿；有 ❌ 按提示修
+> （adb 过期、手机没连、profile 没注册进 `dsh.profile.bundles`）。
+> 最后告诉我：装到哪个 profile、doctor 结果、需要「重启 DSH」还是「刷新侧栏」。不要修改仓库里的代码文件。
 
 ## 工作原理
 
@@ -53,7 +61,7 @@
 │  video.js    adb reverse + 帧解析       │ ───► │scrcpy- │
 │  control.js  控制消息编码                │ ◄─── │server  │
 │  longshot.js 逐帧拼接                    │      └────────┘
-│  index.js    12 工具 + 18 HTTP 路由      │
+│  index.js    12 工具 + 19 HTTP 路由      │
 └───────────────┬────────────────────────┘
                 │ HTTP（视频流 + 控制）
 ┌───────────────▼────────────────────────┐
@@ -66,8 +74,8 @@
 
 | 文档 | 内容 |
 |---|---|
-| [使用说明](docs/usage.md) | 安装与卸载细节、侧栏手势、清晰度、设置页、打开 App、会话与控制权、附带 skill |
-| [工具与接口](docs/tools.md) | 12 个 `phone_*` 工具、动作语义、18 个 HTTP 接口 |
+| [使用说明](docs/usage.md) | 安装与卸载细节、侧栏手势、清晰度、设置页、打开 App、会话与控制权 |
+| [工具与接口](docs/tools.md) | 12 个 `phone_*` 工具、动作语义、19 个 HTTP 接口 |
 | [工作原理](docs/protocol.md) | 三条链路、坐标空间、五条关键设计、性能数字 |
 | [排障](docs/troubleshooting.md) | 自检、adb 查找顺序、常见问题、清残留 |
 

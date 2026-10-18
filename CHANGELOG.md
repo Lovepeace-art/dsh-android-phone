@@ -18,13 +18,17 @@
 - `npm run check` 的 install.ps1 编码校验改为「文件存在才校验」；`doctor` 的安装提示改为「用 DSH 插件页重新安装」。
 - 状态行去掉「前台 xxx」与「编码」二字（悬停提示仍在）。
 
-### 老用户升级
-- 状态行去掉「前台 xxx」与「编码」二字（悬停提示仍在）。
-- 控制权：人接管后的静默租约 **90s → 60s**；顶栏控制权胶囊在人持有时变成按钮，**点一下即交还模型**
-  （文案仍固定「🤖 模型持有」，只有颜色区分绿/灰）。
+- **控制权：任何「人操作」都立即接管**——手指碰手机玻璃（监听 `/dev/input` 的 `getevent`）、在侧栏点 / 拖 / 滚 /
+  打字 / 粘贴 / 打开 App，都会把人接管状态续租；静默 **60 秒**自动交还模型。顶栏控制权胶囊在人持有时变成按钮，
+  **点一下即交还**。默认持有人仍是 AI。
 - README 增加「免责声明」小节（与各 App 及 adb / scrcpy 无关联、使用风险自担、侵权联系即删）。
-`git pull` 后重启 DSH 即可。如果本机 profile 里还留着 `<profile>\vendor\dsh-android-phone\skills` 副本
-与 `cordis.patch.yml` 的 `customSkillDirs` 条目，删掉那一行并删掉该目录（否则同名技能可能出现两次）。
+
+### 老用户升级
+
+`git pull` 后重启 DSH 即可（`src/**` 有改动，触摸接管必须重启才加载；`client.js` 只改 UI 的话硬刷新侧栏即可）。
+如果本机 profile 里还留着 `<profile>\vendor\dsh-android-phone\skills` 副本与 `cordis.patch.yml` 的
+`customSkillDirs` 条目，删掉那一行并删掉该目录（否则同名技能可能出现两次）。
+
 ## 1.1.1 — 2026-10-18
 
 ### 新增
