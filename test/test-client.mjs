@@ -24,16 +24,26 @@ function check(name, ok, info = '') { checks.push({ name, ok: !!ok, info: String
 
 const requireFrom = createRequire(join(MODULES, 'noop.js'));
 let React; let ReactDOMServer; let JSDOM; let createRoot;
-try {
-  React = requireFrom('react');
-  ReactDOMServer = requireFrom('react-dom/server');
-  JSDOM = requireFrom('jsdom').JSDOM;
-  createRoot = requireFrom('react-dom/client').createRoot;
-  check('测试依赖可用（react/react-dom/jsdom）', true, MODULES);
-} catch (e) {
-  console.error(`缺少测试依赖：${e.message}\n请先安装，或用 CLIENT_TEST_MODULES 指向有这些包的 node_modules 目录`);
-  process.exit(2);
+const deps = [
+  ['react', (m) => { React = m; }],
+  ['react-dom/server', (m) => { ReactDOMServer = m; }],
+  ['jsdom', (m) => { JSDOM = m.JSDOM; }],
+  ['react-dom/client', (m) => { createRoot = m.createRoot; }],
+];
+for (const [name, take] of deps) {
+  try {
+    take(requireFrom(name));
+  } catch (e) {
+    const stack = (e && e.stack ? String(e.stack) : String(e)).split('\n').slice(0, 10).join('\n  ');
+    console.error(`加载测试依赖失败: ${name}`);
+    console.error(`  解析目录: ${MODULES}`);
+    console.error(`  node: ${process.version} / ${process.platform}`);
+    console.error(`  ${stack}`);
+    console.error('\n请先 npm install，或用 CLIENT_TEST_MODULES 指向有这些包的 node_modules 目录');
+    process.exit(2);
+  }
 }
+check('测试依赖可用（react/react-dom/jsdom）', true, MODULES);
 
 const src = readFileSync(join(ROOT, 'client.js'), 'utf8');
 const pkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'));
