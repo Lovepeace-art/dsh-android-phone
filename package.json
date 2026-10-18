@@ -16,6 +16,7 @@
     "src",
     "actions",
     "scripts/install.ps1",
+    "scripts/doctor.mjs",
     "skills",
     "vendor",
     "cordis.patch.yml",
@@ -61,6 +62,7 @@
     "test": "node test/test-stitch.mjs && node test/test-client.mjs",
     "test:offline": "node test/test-stitch.mjs && node test/test-client.mjs",
     "test:device": "node test/test-plugin-tools.mjs && node test/test-session.mjs && node test/test-host.mjs && node test/test-e2e-jd.mjs",
+    "doctor": "node scripts/doctor.mjs",
     "install:profile": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/install.ps1",
     "uninstall:profile": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/install.ps1 -Uninstall"
   },
