@@ -1,6 +1,6 @@
 {
   "name": "dsh-android-phone",
-  "version": "1.2.0",
+  "version": "1.0.0",
   "description": "DSH 侧栏里的安卓真机：scrcpy 实时画面 + 亚毫秒控制通道 + 截屏/长截图，并把手机操作能力作为工具交给模型",
   "icon": "assets/icon.png",
   "type": "module",
