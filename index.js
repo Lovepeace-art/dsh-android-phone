@@ -19,7 +19,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import {
-  adbVersion, currentFocus, deviceProps, healAdb, keyevent, launchApp, listDevices, listPackages, longPress,
+  adbVersion, currentFocus, deviceProps, healAdb, keyevent, launchApp, listDevices, listLaunchablePackages, listPackages, longPress,
   pickDevice, resolveAdb, screenMetrics, screencap, scrollByScreen, swipe, tap, typeText, uiDump, wake,
 } from './src/android/adb.js';
 import { ensureForeground, listActions, runAction, runActions, validateAction } from './src/android/actions.js';
@@ -702,6 +702,7 @@ function buildToolDefs(ctx, cfg, state, log) {
       properties: {
         filter: { type: 'string', description: '包名关键字（大小写不敏感）' },
         system: { type: 'boolean', description: 'true 时连系统应用一起列（很多）' },
+        launchable: { type: 'boolean', description: 'true 时只列桌面上有图标（带 LAUNCHER Activity）的应用，用于「打开 App」候选' },
         serial: { type: 'string' },
       },
       additionalProperties: false,
@@ -709,7 +710,9 @@ function buildToolDefs(ctx, cfg, state, log) {
     output: { schema: { type: 'object' }, render: (_a, v) => [{ type: 'text', text: `共 ${v.count} 个：\n${(v.packages || []).join('\n')}` }] },
     execute: async (args = {}) => {
       const serial = await resolveSerial(args.serial);
-      let pkgs = await listPackages(serial, undefined, { adbPath: cfg.adbPath, system: !!args.system });
+      let pkgs = args.launchable
+        ? await listLaunchablePackages(serial, { adbPath: cfg.adbPath })
+        : await listPackages(serial, undefined, { adbPath: cfg.adbPath, system: !!args.system });
       if (args.filter) {
         const f = String(args.filter).toLowerCase();
         pkgs = pkgs.filter((p) => p.toLowerCase().includes(f));
@@ -1350,7 +1353,7 @@ export function apply(ctx, config = {}) {
         }
         if (route === 'keyboard') { json(res, 200, await call('phone_keyboard', args)); return; }
         if (route === 'clipboard') { json(res, 200, await call('phone_clipboard', args)); return; }
-        if (route === 'apps') { json(res, 200, await call('phone_apps', args)); return; }
+        // 侧栏设置「从手机添加」只要桌面上有图标的 App（没有启动图标的包点了也打不开）\n        if (route === 'apps') { json(res, 200, await call('phone_apps', { ...args, launchable: true })); return; }
         if (route === 'inspect') { json(res, 200, await call('phone_inspect', args)); return; }
         if (route === 'shot') {
           // 侧栏截图机：长截图支持 op=start / op=stop，进度走 GET /longshot（可随时停）

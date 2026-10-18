@@ -377,6 +377,28 @@ export async function listPackages(serial, filter, opts = {}) {
   return out.split(/\r?\n/).map((l) => l.replace(/^package:/, '').trim()).filter(Boolean);
 }
 
+/**
+ * 列出「桌面上有图标」的应用（带 LAUNCHER Activity 的包）。
+ *
+ * 用途：侧栏设置「从手机添加」只该给真正能启动的 App，不能把没有启动图标的
+ * SDK / 插件包也灌进去（用户 2026-10-18 要求）。一次 `cmd package query-activities`
+ * 就能拿全，比逐包 `resolve-activity` 快两个数量级。
+ */
+export async function listLaunchablePackages(serial, opts = {}) {
+  const out = await shell(
+    serial,
+    'cmd package query-activities -a android.intent.action.MAIN -c android.intent.category.LAUNCHER',
+    { ...opts, timeoutMs: opts.timeoutMs ?? 20000 },
+  );
+  const pkgs = [...new Set(out.split(/\r?\n/).map((l) => {
+    const m = /^\s*packageName=(\S+)\s*$/.exec(l);
+    return m ? m[1] : '';
+  }).filter(Boolean))].sort();
+  if (pkgs.length) return pkgs;
+  // 精简 ROM / 老机型上 `cmd package` 可能不可用 → 退回第三方包列表（宁可多不可空）
+  return listPackages(serial, undefined, { ...opts, system: false });
+}
+
 export async function launchApp(serial, pkg, opts = {}) {
   // monkey 比 am start 抗「找不到默认 Activity」，代价是偶发等 1s
   return shell(serial, `monkey -p ${pkg} -c android.intent.category.LAUNCHER 1`, { ...opts, timeoutMs: 20000 });

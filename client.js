@@ -1171,6 +1171,12 @@ window.__ModuleLoader__.load({
 
       /** 面板根节点的 keydown：所有键盘输入的唯一入口（根节点 tabIndex=0，点面板就会聚焦） */
       const onPanelKeyDown = (e) => {
+        // 焦点在面板自己的输入控件里（设置页的截图目录 / App 名称 / 包名 / 筛选框 …）时一律放行：
+        // 键盘直通只服务「把键送进手机」，不能把面板内部的文字编辑也抢走
+        // （2026-10-18 用户反馈「backspace 键是坏掉的」——就是这里的 e.preventDefault() 把输入框的删字吃掉了）。
+        const el = e.target;
+        const tag = el && el.tagName ? String(el.tagName).toLowerCase() : '';
+        if (tag === 'input' || tag === 'textarea' || tag === 'select' || (el && el.isContentEditable)) return;
         // Ctrl+V / Cmd+V：把电脑剪贴板送进手机（中文唯一可靠入口，见 pushClipboard）
         if ((e.ctrlKey || e.metaKey) && !e.altKey && (e.key === 'v' || e.key === 'V')) {
           e.preventDefault();
@@ -1546,7 +1552,7 @@ window.__ModuleLoader__.load({
         ),
         h("div", { style: S.settingsBlock },
           h("div", { style: S.hintTitle }, "④ 打开 App（工具栏「▶ 打开」的候选）"),
-          h("div", { style: bodyS }, "这里配的就是工具栏下拉里的候选（只列这些，不灌整台手机）。想加手机里已有的 App：用下面的「从手机添加」挑一个，改完点「💾 保存 App 列表」才生效。"),
+          h("div", { style: bodyS }, "这里配的就是工具栏下拉里的候选（只列这些，不灌整台手机）。想加手机里已有的 App：用下面的「从手机添加」挑一个（只列桌面上有图标的 App），名字默认取包名末段、可以改成中文，改完点「💾 保存 App 列表」才生效。"),
           apps.length === 0
             ? h("div", { style: bodyS }, "（空，点下面「＋ 新增」或「恢复默认列表」）")
             : null,
@@ -1583,7 +1589,7 @@ window.__ModuleLoader__.load({
               value: "", "data-app-installed": "1",
               onChange: (e) => { addInstalled(e.target.value); e.target.value = ""; },
             },
-              h("option", { value: "" }, instFiltered.length ? `选一个（${instFiltered.length}）…` : (installed.length ? "没有匹配的包名" : "正在读手机应用…")),
+              h("option", { value: "" }, instFiltered.length ? `选一个桌面应用（${instFiltered.length}）…` : (installed.length ? "没有匹配的包名" : "正在读桌面应用…")),
               instFiltered.slice(0, 300).map((pk) => h("option", { key: pk, value: pk }, pk)),
             ),
           ),

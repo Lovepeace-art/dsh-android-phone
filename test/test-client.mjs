@@ -587,6 +587,27 @@ if (rootEl) {
     enterCall?.body?.action === 'key' && enterCall?.body?.key === 'ENTER', JSON.stringify(enterCall?.body));
 
   calls.length = 0;
+  rootEl.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'Backspace', bubbles: true, cancelable: true }));
+  await flush(); await flush(); await flush();
+  const delCall = calls.filter((c) => c.url.endsWith('/action')).pop();
+  check('键盘直通：Backspace 映射成 key DEL（2026-10-18 用户反馈「backspace 键是坏掉的」）',
+    delCall?.body?.action === 'key' && delCall?.body?.key === 'DEL', JSON.stringify(delCall?.body));
+
+  // 焦点在面板自己的输入控件里时，键盘直通必须让路：否则 e.preventDefault() 会把
+  // 输入框的删字/打字一起吃掉（就是用户报的 backspace 坏掉）。
+  calls.length = 0;
+  const probeInput = w.document.createElement('input');
+  rootEl.appendChild(probeInput);
+  probeInput.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'Backspace', bubbles: true, cancelable: true }));
+  probeInput.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'x', bubbles: true, cancelable: true }));
+  await new Promise((r) => setTimeout(r, 40));
+  await flush();
+  const leaked = calls.filter((c) => c.url.endsWith('/action') || c.url.endsWith('/keyboard'));
+  check('焦点在面板输入框里时键盘不抢（Backspace/字符都留给输入框）',
+    leaked.length === 0, JSON.stringify(leaked.map((c) => c.body)));
+  probeInput.remove();
+
+  calls.length = 0;
   for (const ch of ['a', 'b']) rootEl.dispatchEvent(new w.KeyboardEvent('keydown', { key: ch, bubbles: true, cancelable: true }));
   await new Promise((r) => setTimeout(r, 80));
   await flush();
