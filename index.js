@@ -502,7 +502,9 @@ function buildToolDefs(ctx, cfg, state, log) {
       const pointerId = Number.isFinite(Number(args.pointerId)) ? Number(args.pointerId) : undefined;
       return { type: 'touch', phase, at: [nx ?? 0.5, ny ?? 0.5], pointerId, raw };
     }
-    if (a === 'key') return { type: 'key', key: args.key || 'BACK' };
+    // 修饰键组合（Ctrl+A 全选、Ctrl+C 复制…）：meta 交给控制通道的 metaState 表达，
+    // adb 的 `input keyevent` 没法带修饰键，走 adb 时这两个字段会被忽略。
+    if (a === 'key') return { type: 'key', key: args.key || 'BACK', meta: args.meta, metaState: args.metaState };
     if (a === 'type' || a === 'text') return { type: 'text', text: String(args.text ?? '') };
     if (a === 'launch') return { type: 'launch', package: args.package || args.pkg };
     if (a === 'wait') return { type: 'wait', ms: Number(args.ms) || 500 };
@@ -1236,6 +1238,19 @@ export function apply(ctx, config = {}) {
       return;
     }
 
+
+      // 插件图标：DSH「插件」页与侧栏 tab 都从这里取；纯静态，不需要设备
+      if (method === 'GET' && (route === 'icon.png' || route === 'icon')) {
+        try {
+          const buf = readFileSync(join(PLUGIN_ROOT, 'assets', 'icon.png'));
+          res.writeHead(200, { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=86400' });
+          res.end(buf);
+        } catch {
+          res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+          res.end('no icon');
+        }
+        return;
+      }
     if (method === 'GET' && (route === '' || route === 'status')) {
       const tools = buildToolset();
       const t = tools.find((x) => x.name === 'phone_status');
@@ -1353,7 +1368,8 @@ export function apply(ctx, config = {}) {
         }
         if (route === 'keyboard') { json(res, 200, await call('phone_keyboard', args)); return; }
         if (route === 'clipboard') { json(res, 200, await call('phone_clipboard', args)); return; }
-        // 侧栏设置「从手机添加」只要桌面上有图标的 App（没有启动图标的包点了也打不开）\n        if (route === 'apps') { json(res, 200, await call('phone_apps', { ...args, launchable: true })); return; }
+        // 侧栏设置「从手机添加」只要桌面上有图标的 App（没有启动图标的包点了也打不开）
+        if (route === 'apps') { json(res, 200, await call('phone_apps', { ...args, launchable: true })); return; }
         if (route === 'inspect') { json(res, 200, await call('phone_inspect', args)); return; }
         if (route === 'shot') {
           // 侧栏截图机：长截图支持 op=start / op=stop，进度走 GET /longshot（可随时停）

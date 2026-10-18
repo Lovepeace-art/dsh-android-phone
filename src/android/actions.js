@@ -30,6 +30,25 @@ export const ACTION_TYPES = ['tap', 'long_press', 'drag', 'scroll', 'wheel', 'to
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /**
+ * 组合键修饰符 → Android `metaState` 位。
+ * 接受 `'ctrl'` / `'ctrl+shift'` / `['ctrl']` / 直接的数字，对应控制通道
+ * `INJECT_KEYCODE.metaState`（服务端 `KeyEvent` 同一套常量）。
+ */
+function metaStateOf(meta) {
+  if (typeof meta === 'number' && Number.isFinite(meta)) return meta;
+  const list = Array.isArray(meta) ? meta : String(meta == null ? '' : meta).split(/[+,\s]+/);
+  let s = 0;
+  for (const m of list) {
+    const k = String(m).toLowerCase();
+    if (k === 'ctrl' || k === 'control') s |= 0x1000;
+    else if (k === 'shift') s |= 0x1;
+    else if (k === 'alt') s |= 0x2;
+    else if (k === 'meta' || k === 'cmd' || k === 'win' || k === 'super') s |= 0x10000;
+  }
+  return s;
+}
+
+/**
  * 没有控制通道时，把 `touch` 事件流攒成一次 `adb input`（人用鼠标拖拽的回落路径）。
  * 键 = `${serial}|${by}`，因为同一个插件进程可能同时在给人（侧栏）和模型用。
  */
@@ -208,10 +227,19 @@ export async function runAction(serial, metrics, action, opts = {}) {
       const keyName = String(action.key);
       // 归一化：`APP_SWITCH` / `DPAD_UP` 这些 Android 常量名要能对上小写键表（见 adb.js 的 normKey 注释）
       const norm = keyName.toLowerCase().replace(/[^a-z0-9]/g, '');
+      // 组合键（Ctrl+A 全选 / Ctrl+C 复制）必须带 metaState 才会被 EditText 认；
+      // 2026-10-18 用户反馈「Ctrl+A 在手机里全选失效」，就是以前这里把 meta 丢了。
+      const metaState = metaStateOf(action.metaState != null ? action.metaState : action.meta);
       const code = useCtl ? (KEYCODES[norm] ?? KEYCODES[keyName]) : null;
-      if (useCtl && code) { const r = ctl.keycode(code); if (!r.ok) fail('keycode', r); }
-      else await keyevent(serial, action.key, adbOpts);
-      detail = action.key;
+      if (useCtl && code) {
+        const r = ctl.keycode(code, { metaState });
+        if (!r.ok) fail('keycode', r);
+      } else if (metaState) {
+        // adb 的 `input keyevent` 表达不了修饰键：静默退化成裸键会让「全选」变成「输入 a」，
+        // 宁可明确报错，让调用方知道必须走控制通道。
+        throw new Error(`组合键 ${action.key} 需要控制通道（adb input keyevent 不支持修饰键）`);
+      } else await keyevent(serial, action.key, adbOpts);
+      detail = metaState ? `${String(action.meta || `0x${metaState.toString(16)}`)}+${action.key}` : action.key;
       break;
     }
     case 'text':

@@ -2,6 +2,22 @@
 
 本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## 1.1.1 — 2026-10-18
+
+### 新增
+
+- **插件图标**：`assets/icon.png`（256×256，圆形描边、外圈透明）+ `assets/icon-64.png`。`package.json` 增加 `icon` 与 `exports["./icon"]`，DSH「插件」页直接显示；宿主新增 `GET /icon.png`，侧栏 tab 标题图标从 emoji 换成它（加载失败自动回落 emoji）。
+- `scripts/check.mjs` 增加第 5 项守门：**注释吞代码检测** —— `//` 注释里出现字面量 `\n` / `\r` / `\t` 时整行后面的代码会被并进注释，检测到即报错。这是本项目真实踩过的坑（`index.js` 一条注释里的字面量 `\n` 把紧随其后的 `/apps` 路由并进了注释，造成「从手机添加」静默失效）。
+
+### 修复
+
+- **Ctrl+A 在手机里全选无效**：键盘直通原先只拦 `Ctrl+[CVZX]`，`Ctrl+A` 落给浏览器「全选网页文字」。现在拦 `Ctrl+[A C V X Z Y]`（且不带 Alt/Shift）并转发为 `INJECT_KEYCODE(A, metaState=META_CTRL_ON)`；`phone_action` 的 `key` 动作新增 `meta` 参数（`ctrl` / `alt` / `shift` / `meta` 任意组合，也可直接给 `0x1000` 这类原始值）。
+- `/apps` 路由失效（同上面那条注释 bug）。
+
+### 变更
+
+- **README 精简重排**：标题、副标题、图标居中；`## 文档` 移到 `## 工作原理` 之后；安装段改为「复制到插件目录 / `install.ps1`（`-Copy` 自包含、`-Uninstall` 卸载）/ 让 agent 代装」三段式，被删掉的细节一律进 `docs/`。
+- `docs/usage.md` 新增「安装与卸载」小节。
 ## 1.1.0 — 2026-10-18
 
 ### 新增

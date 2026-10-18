@@ -103,6 +103,60 @@ if (tracked === null) {
   else pass(`git 产物检查：${tracked.length} 个跟踪文件里没有调试产物`);
 }
 
+// ── 5. 注释吃掉代码 ────────────────────────────────────────
+// 真实事故：一次脚本化替换把 "\n" 当转义字符写进了 `//` 注释，于是同一行后面的
+// `if (route === 'apps') …` 整段被注释掉 —— 语法合法、测试没覆盖，功能静默消失。
+// 规则：① 单行注释里出现字面量 \n / \t；② // 之后紧跟控制流（if/for/while/return）语句。
+const COMMENT_BUGS = [];
+for (const file of walk(ROOT)) {
+  const rel = relative(ROOT, file).replaceAll('\\', '/');
+  // 本文件自身要描述这些模式（注释里必然出现字面量转义），跳过以免自我误报
+  if (rel === 'scripts/check.mjs') continue;
+  readFileSync(file, 'utf8').split(/\r?\n/).forEach((line, i) => {
+    const idx = line.indexOf('//');
+    if (idx < 0) return;
+    const comment = line.slice(idx + 2);
+    if (/\\[nt]/.test(comment)) {
+      COMMENT_BUGS.push(`${rel}:${i + 1} 注释里有字面量 \\n/\\t（很可能是替换脚本写错，吞掉了后面的代码）`);
+    }
+    const tail = comment.trim();
+    if (/^(?:if|for|while|do|return|throw|const|let|var|await|import|export)\b/.test(tail) && /[;{]\s*$/.test(tail)) {
+      COMMENT_BUGS.push(`${rel}:${i + 1} 这行 // 后面像是可执行代码：${tail.slice(0, 70)}`);
+    }
+  });
+}
+if (COMMENT_BUGS.length === 0) pass('注释检查：没有被注释吃掉的代码');
+else fail(`注释检查：${COMMENT_BUGS.length} 处可疑`, COMMENT_BUGS.join('\n'));
+
+// ── 6. 插件图标链路 ────────────────────────────────────────
+// 图标在五处被引用：assets/icon.png 文件本身、package.json 的 icon、exports "./icon"、
+// 宿主 /icon.png 路由、client.js 的侧栏 tab。任何一处对不上都会静默退回默认插画，所以做静态自检。
+const ICON_PROBLEMS = [];
+const iconFile = join(ROOT, 'assets', 'icon.png');
+try {
+  const bytes = readFileSync(iconFile);
+  if (!(bytes.length > 8 && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47)) {
+    ICON_PROBLEMS.push('assets/icon.png 不是合法 PNG');
+  }
+} catch {
+  ICON_PROBLEMS.push('assets/icon.png 不存在');
+}
+try {
+  const pkgJson = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'));
+  if (pkgJson.icon !== 'assets/icon.png') ICON_PROBLEMS.push(`package.json 的 icon 应为 assets/icon.png，实际 ${JSON.stringify(pkgJson.icon)}`);
+  if (!pkgJson.exports || pkgJson.exports['./icon'] !== './assets/icon.png') ICON_PROBLEMS.push('package.json 缺少 exports "./icon": "./assets/icon.png"');
+  if (!Array.isArray(pkgJson.files) || !pkgJson.files.includes('assets')) ICON_PROBLEMS.push('package.json 的 files 缺少 assets');
+} catch (e) {
+  ICON_PROBLEMS.push(`package.json 读取失败：${e.message}`);
+}
+try {
+  if (!/route === 'icon\.png'/.test(readFileSync(join(ROOT, 'index.js'), 'utf8'))) ICON_PROBLEMS.push("index.js 没有 /icon.png 路由");
+  if (!/\/icon\.png/.test(readFileSync(join(ROOT, 'client.js'), 'utf8'))) ICON_PROBLEMS.push('client.js 的侧栏 tab 没有引用 icon.png');
+} catch (e) {
+  ICON_PROBLEMS.push(`index.js/client.js 读取失败：${e.message}`);
+}
+if (ICON_PROBLEMS.length === 0) pass('图标链路：icon.png + manifest + exports + /icon.png 路由 + 侧栏引用齐全');
+else fail(`图标链路：${ICON_PROBLEMS.length} 处不一致`, ICON_PROBLEMS.join('\n'));
 // ── 输出 ───────────────────────────────────────────────────
 let failed = 0;
 for (const r of results) {

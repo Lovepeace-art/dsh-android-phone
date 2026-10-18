@@ -1159,8 +1159,8 @@ window.__ModuleLoader__.load({
         if (!k.timer) k.timer = setTimeout(() => { k.timer = null; flushKeys(); }, KEY_BATCH_MS);
       }, [flushKeys]);
 
-      const sendKey = useCallback((key) => {
-        void claimHuman().then(() => post('/action', { action: 'key', key, human: true }, ''));
+      const sendKey = useCallback((key, meta) => {
+        void claimHuman().then(() => post('/action', { action: 'key', key, ...(meta ? { meta } : {}), human: true }, ''));
       }, [post, claimHuman]);
 
       // 物理键 → Android keycode（其余可打印字符走 INJECT_TEXT）
@@ -1181,6 +1181,16 @@ window.__ModuleLoader__.load({
         if ((e.ctrlKey || e.metaKey) && !e.altKey && (e.key === 'v' || e.key === 'V')) {
           e.preventDefault();
           void pushClipboard();
+          return;
+        }
+        // Ctrl/Cmd + A/C/X/Z/Y：**手机内**的编辑快捷键（全选 / 复制 / 剪切 / 撤销 / 重做）。
+        // 2026-10-18 用户反馈「Ctrl+A 在手机内全选失效」——以前带修饰键的键一律放行给 DSH，
+        // 而 Android 的 EditText 只在 metaState 带 META_CTRL_ON(0x1000) 时才认这些组合，
+        // 所以这里必须拦下来、显式带上 meta 送进控制通道（adb 的 input keyevent 做不到）。
+        if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && /^[acxzy]$/i.test(String(e.key || ''))) {
+          e.preventDefault();
+          flushKeys();
+          sendKey(String(e.key).toUpperCase(), 'ctrl');
           return;
         }
         // 其余带修饰键的一律放行：Ctrl/Cmd/Alt 组合留给 DSH 自己的快捷键
@@ -1672,7 +1682,13 @@ window.__ModuleLoader__.load({
           id: 'dsh-android-phone',
           title: '手机',
           description: '安卓真机：实时画面 + 操作注入 + 截图/长截图',
-          icon: '📱',
+        icon: h('img', {
+          src: `${apiBase(cc)}/icon.png`,
+          alt: '',
+          width: 16,
+          height: 16,
+          style: { display: 'block', borderRadius: '50%' },
+        }),
           order: 61,
           single: true,
           component: () => h(Panel, { ctx }),

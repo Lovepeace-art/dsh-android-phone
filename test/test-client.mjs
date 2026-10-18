@@ -228,7 +228,10 @@ try { exported.apply(ctx); } catch (e) { applyOk = false; applyErr = e.message; 
 check('apply 不抛异常', applyOk, applyErr);
 check('registerTab 被调用一次且包在 ctx.effect 里', mediaStore.tabs.length === 1 && mediaStore.effectCount >= 1, `${mediaStore.tabs.length} tabs / ${mediaStore.effectCount} effects`);
 const tab = mediaStore.tabs[0] || {};
-check('tab 元数据正确（id/title/icon/single）', tab.id === pkg.name && tab.title === '手机' && tab.icon === '📱' && tab.single === true, JSON.stringify({ id: tab.id, title: tab.title, icon: tab.icon, single: tab.single }));
+// tab 图标自 2026-10-18 起是图片（betterSidebar 的 icon 支持 ReactNode）：
+// 断言它是个 <img>，src 指向插件自己的 /icon.png 路由。
+const tabIconSrc = tab.icon && tab.icon.props && tab.icon.props.src ? String(tab.icon.props.src) : '';
+check('tab 元数据正确（id/title/icon/single）', tab.id === pkg.name && tab.title === '手机' && /\/dsh-android-phone\/api\/icon\.png$/.test(tabIconSrc) && tab.single === true, JSON.stringify({ id: tab.id, title: tab.title, icon: tabIconSrc, single: tab.single }));
 
 // betterSidebar 缺失时只 warn 不抛
 let warnOk = true; let warned = '';
@@ -633,11 +636,32 @@ if (rootEl) {
     kbCall?.body?.text === 'ab' && kbCall?.body?.submit === false, JSON.stringify(kbCall?.body));
 
   calls.length = 0;
-  rootEl.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'c', ctrlKey: true, bubbles: true, cancelable: true }));
+  rootEl.dispatchEvent(new w.KeyboardEvent('keydown', { key: 's', ctrlKey: true, bubbles: true, cancelable: true }));
   await new Promise((r) => setTimeout(r, 60));
   await flush();
-  check('带 Ctrl/Cmd 的组合键不拦（留给 DSH 自己的快捷键）',
-    !calls.some((c) => c.url.endsWith('/keyboard') && /c/.test(c.body?.text || '')),
+  check('其余 Ctrl/Cmd 组合键不拦（留给 DSH 自己的快捷键，如 Ctrl+S）',
+    !calls.some((c) => c.url.endsWith('/keyboard') && /s/.test(c.body?.text || '')),
+    JSON.stringify(calls.map((c) => c.body)));
+
+  // Ctrl+A / Ctrl+C / Ctrl+X / Ctrl+Z / Ctrl+Y = 手机内的编辑快捷键。
+  // 2026-10-18 用户反馈「Ctrl+A 在手机内全选失效」：这些组合必须带 meta=ctrl 走 /action，
+  // 否则 EditText 拿不到 META_CTRL_ON，全选/复制全都不生效。
+  for (const [ch, keyName] of [['a', 'A'], ['c', 'C'], ['x', 'X'], ['z', 'Z'], ['y', 'Y']]) {
+    calls.length = 0;
+    const ev = new w.KeyboardEvent('keydown', { key: ch, ctrlKey: true, bubbles: true, cancelable: true });
+    rootEl.dispatchEvent(ev);
+    await flush(); await flush(); await flush();
+    const act = calls.filter((c) => c.url.endsWith('/action')).pop();
+    check(`Ctrl+${keyName} 送进手机（key=${keyName} + meta=ctrl，且不让浏览器抢走）`,
+      act?.body?.action === 'key' && act?.body?.key === keyName && act?.body?.meta === 'ctrl' && act?.body?.human === true && ev.defaultPrevented,
+      act ? JSON.stringify(act.body) : `没有发 /action（calls=${calls.map((c) => c.url.split('/').pop()).join(',')}）`);
+  }
+  // Ctrl+Shift+A 不属于文本编辑组合，仍然放行给 DSH（不误伤 DSH 的快捷键）
+  calls.length = 0;
+  rootEl.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'a', ctrlKey: true, shiftKey: true, bubbles: true, cancelable: true }));
+  await flush(); await flush();
+  check('Ctrl+Shift+A 仍放行给 DSH（只接管纯 Ctrl+字母）',
+    !calls.some((c) => c.url.endsWith('/action')),
     JSON.stringify(calls.map((c) => c.body)));
 }
 

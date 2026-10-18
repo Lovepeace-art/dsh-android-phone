@@ -1,23 +1,16 @@
-# dsh-android-phone
+<p align="center"><img src="assets/icon.png" width="120" height="120" alt="dsh-android-phone"></p>
 
-**把安卓真机搬进 DeepSeek Harness 的侧栏**
+<h1 align="center">dsh-android-phone</h1>
+
+<p align="center"><b>把安卓真机搬进 DeepSeek Harness 的侧栏</b></p>
 
 ## 能力
 
-- 安装dsh-better-sidebar后**实时显示手机画面，不安装也可ai操作手机**
-- **亚毫秒控制**：支持点按、长按、拖拽、滚轮、双指缩放、PC键盘直通
+- 安装 dsh-better-sidebar 后**实时显示手机画面，不安装也可 ai 操作手机**
+- **亚毫秒控制**：支持点按、长按、拖拽、滚轮、双指缩放、PC 键盘直通
 - 支持**截屏 / 长截图**
 - 同一套能力作为工具交给模型 ——「AI 自动操作手机」和「用户手机画面展示」共用**同一条链路、同一个会话**
-- （尚在构思中）agent自动操作手机，打通IM-PC-PHONE工作流
-
-## 文档
-
-| 文档 | 内容 |
-|---|---|
-| [使用说明](docs/usage.md) | 侧栏手势、清晰度、设置页、打开 App、会话与控制权、附带 skill |
-| [工具与接口](docs/tools.md) | 12 个 `phone_*` 工具、动作语义、18 个 HTTP 接口 |
-| [工作原理](docs/protocol.md) | 三条链路、坐标空间、五条关键设计、性能数字 |
-| [排障](docs/troubleshooting.md) | 自检、adb 查找顺序、常见问题、清残留 |
+- （尚在构思中）agent 自动操作手机，打通 IM-PC-PHONE 工作流
 
 ## 环境要求
 
@@ -29,25 +22,31 @@
 | 安卓手机          | 「开发者选项 → USB 调试」打开，插 USB，弹窗点「一律允许」； USB 模式任选                                       |
 | 可选            | `dsh-better-sidebar ^0.25.0` —— 只有「侧栏 tab」需要它；没装则没有侧栏实时手机页面，但**设置项在 DSH「插件」页里照样能用**，模型工具也照常可用 |
 
-
 ## 安装
 
-```powershell
-# 解压到任意目录，cd 进去，然后：
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts\install.ps1
-# 重启 DSH → 装了 better-sidebar 时侧栏出现「📱 手机」tab；设置项始终在「插件」页 → dsh-android-phone
+把整个插件目录**复制**到本机任意位置，然后在目录里跑一次安装脚本。脚本以**复制**方式装进 DSH 的 profile（`~/.dsh/profiles/desktop/vendor/dsh-android-phone`）—— 不建指向源码目录的 junction，装完源码目录可以随便挪走或删掉：
 
-... -WhatIfOnly   # 只预览要改什么
-... -Copy         # 复制成自包含（不用 junction）
-... -Uninstall    # 卸载
+```powershell
+# 在插件目录下执行（先用 -WhatIfOnly 可以只预览将要改动的内容）
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\install.ps1 -Copy
 ```
 
-脚本做四件事：包 junction 到 `<profile>\node_modules\dsh-android-phone`、名字加进 `dsh.profile.bundles`、`dependencies` 声明 `link:<相对路径>`、把 `skills/` **同步一份**到 `<profile>\vendor\dsh-android-phone\skills` 并登记成 skill 根。
+完整卸载（摘掉注册信息、依赖声明与附带 skill，不动你的手机和截图）：
 
-- 官方 `dsh plugin add` 会拒绝 desktop profile（"managed exclusively by the Electron application"），所以安装由脚本自己做。
-- ⚠️ `install.ps1` 必须保持 **UTF-8 BOM**：Windows PowerShell 5.1 读无 BOM 的 `.ps1` 会按 ANSI 解码，中文变乱码并报一堆假的 `Missing closing '}'`。
-- 装好后 profile 里是**链接**（junction），直接改仓库文件就生效，不用重装。
-- 装完想确认环境是否齐备：`npm run doctor`。
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\install.ps1 -Uninstall
+```
+
+装完**重启 DSH**：插件会出现在 DSH 的「插件」页（可在这里开关与配置）；装了 better-sidebar 时侧栏还会多出「手机」tab。
+
+### 让 agent 帮你装
+
+把下面这段整段发给模型即可：
+
+> 在这台 Windows 机器上安装 DSH 插件 `dsh-android-phone`。插件目录是 `<把你解压/克隆出来的目录填这里>`。
+> 请按顺序做三件事：①在该目录下执行 `powershell -NoProfile -ExecutionPolicy Bypass -File scripts\install.ps1 -Copy`；②执行 `npm run doctor` 确认自检全绿，有 ❌ 就按提示修（缺 adb、手机没连、profile 没注册）；③告诉我结论，以及需要「重启 DSH」还是「刷新侧栏」。不要修改仓库里的代码文件。
+
+安装细节（脚本究竟改了哪些文件、为什么不能用 `dsh plugin add`、BOM 注意事项）见 [使用说明 · 安装与卸载](docs/usage.md#安装与卸载)。
 
 ## 工作原理
 
@@ -65,6 +64,15 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\install.ps1
 │  client.js  WebCodecs 解码 → canvas 上屏 │
 └────────────────────────────────────────┘
 ```
+
+## 文档
+
+| 文档 | 内容 |
+|---|---|
+| [使用说明](docs/usage.md) | 安装与卸载细节、侧栏手势、清晰度、设置页、打开 App、会话与控制权、附带 skill |
+| [工具与接口](docs/tools.md) | 12 个 `phone_*` 工具、动作语义、18 个 HTTP 接口 |
+| [工作原理](docs/protocol.md) | 三条链路、坐标空间、五条关键设计、性能数字 |
+| [排障](docs/troubleshooting.md) | 自检、adb 查找顺序、常见问题、清残留 |
 
 ## 开发
 

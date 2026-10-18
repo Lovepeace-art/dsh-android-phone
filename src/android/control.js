@@ -73,6 +73,17 @@ export const KEYCODES = {
   center: 23, movehome: 122, moveend: 123, pagedown: 93, pageup: 92,
 };
 
+// 字母 a–z（Android KEYCODE_A = 29 … KEYCODE_Z = 54）。
+// 这些只用于**带修饰键的组合**（Ctrl+A 全选、Ctrl+C 复制…），普通打字走 INJECT_TEXT，
+// 不要拿 keycode 逐字敲 —— 那样会绕过输入法，中文和候选词全没了。
+for (let i = 0; i < 26; i += 1) KEYCODES[String.fromCharCode(97 + i)] = 29 + i;
+
+/**
+ * Android `KeyEvent` 的 metaState 位（组合键用）。和服务端 `Controller.injectKeycode` 的
+ * `metaState` 参数同一套常量；只带一个键时也可以直接传数字。
+ */
+export const META = { SHIFT: 0x1, ALT: 0x2, CTRL: 0x1000, META: 0x10000 };
+
 /** 定点数换算常量（见文件头注释） */
 const PRESSURE_SCALE = 65536;
 const SCROLL_SCALE = 2048;

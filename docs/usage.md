@@ -80,3 +80,26 @@ node skills/jd-shop-longshot/scripts/jd-shop-longshot.mjs --keyword 牛奶 --sho
 > 注册的是 **profile 里的副本**，不是仓库路径 —— 仓库搬家/删除都不会让技能静默消失。
 > 代价：改完 `skills/` 要重跑 `npm run install:profile` 再重启 DSH。
 > 跟别的 skill 根重名时自动改名 `<name>-2`（同时改 `SKILL.md` 的 `name:`），不会互相覆盖。
+
+## 安装与卸载
+
+### 安装脚本到底改了什么
+
+`scripts/install.ps1` 做四件事（都在 desktop profile 目录内，不改你的源码目录以外的任何东西）：
+
+1. 把插件包放进 `<profile>\vendor\dsh-android-phone`（`-Copy` 自包含模式；开发时用默认的 link 模式，改仓库文件即时生效）
+2. 把包名 `dsh-android-phone` 写进 `<profile>\package.json` 的 `dsh.profile.bundles`
+3. 在同一个 `package.json` 的 `dependencies` 里声明该包
+4. 把 `skills/` 同步一份到 `<profile>\vendor\dsh-android-phone\skills`，并把该目录登记进 `cordis.patch.yml` 的 `customSkillDirs`（重名会自动加 `-2` 序号）
+
+### 为什么不能用 `dsh plugin add`
+
+官方 `dsh plugin add` 会拒绝 desktop profile（报 "managed exclusively by the Electron application"），所以安装动作由脚本自己做。
+
+### 注意事项
+
+- **`install.ps1` 必须保持 UTF-8 BOM**：Windows PowerShell 5.1 读无 BOM 的 `.ps1` 会按 ANSI 解码，中文变乱码并报一堆假的 `Missing closing '}'`。
+- 改完 `skills/` 要重跑一次安装脚本，profile 里的副本才会更新。
+- 装完想确认环境是否齐备：`npm run doctor`（10 项只读自检：Node / 平台 / vendor 里的 adb 与 scrcpy-server / adb 可用性与版本 / 设备在线 / 屏幕参数 / 截图目录可写 / profile junction 指向本仓库 / bundles 已注册 / skill 根已并入）。
+- 卸载只摘注册信息、依赖声明和 profile 里的副本，**不动手机、不动截图**。
+- 预览要改什么：给脚本加 `-WhatIfOnly`。
