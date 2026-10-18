@@ -19,8 +19,12 @@
     "scripts/doctor.mjs",
     "skills",
     "vendor",
+    "docs",
     "cordis.patch.yml",
     "README.md",
+    "AGENTS.md",
+    "CONTRIBUTING.md",
+    "CHANGELOG.md",
     "LICENSE",
     "NOTICE"
   ],

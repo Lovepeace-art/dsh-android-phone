@@ -42,6 +42,7 @@ DSH（DeepSeek Harness）插件：把安卓真机搬进 DSH 侧栏（实时画�
 | `scripts/check.mjs` | 静态校验（语法 / `install.ps1` 编码 / `.gitattributes`） | `npm run check` |
 | `vendor/` | 随包二进制：platform-tools 37.0.1、scrcpy-server v5.0.1 | 原样分发，不改 |
 | `cordis.patch.yml` | 插件默认配置（adb 路径、起流参数） | — |
+| `docs/` | 使用文档：`usage`（怎么用）/ `tools`（工具与接口）/ `protocol`（原理与协议）/ `troubleshooting`（排障）。**README 只留概览，细节进 docs** | — |
 
 ## 3. 数据流
 
@@ -87,7 +88,8 @@ DSH（DeepSeek Harness）插件：把安卓真机搬进 DSH 侧栏（实时画�
 - 改 `index.js` / `src/**` → `npm run ci`；协议层改动补 `npm run test:device`（真机）
 - 改 `scripts/install.ps1` → `npm run check`（BOM/LF）+ `powershell -NoProfile -ExecutionPolicy Bypass -File scripts\install.ps1 -WhatIfOnly` 干跑
 - 改 `skills/**` → `npm run install:profile` 后重启 DSH 验证技能可见
-- 改了对外接口（工具名/参数/HTTP 路由） → 同步 `README.md` 的工具表与接口列表，`CHANGELOG.md` 记一笔
+- 改了对外接口（工具名/参数/HTTP 路由） → 同步 `docs/tools.md` 的工具表与接口列表，`CHANGELOG.md` 记一笔
+- 改了使用方式（手势/设置项/默认值） → 同步 `docs/usage.md`；README 保持简短，别再往回塞细节
 - 发版 → `package.json` 的 `version`、`CHANGELOG.md` 加小节、打 tag
 
 **测试套件**：
