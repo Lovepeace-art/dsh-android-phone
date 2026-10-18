@@ -193,7 +193,10 @@ window.__ModuleLoader__.load({
       stage: { position: 'relative', flex: '1 1 auto', minHeight: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', overflow: 'hidden' },
       // width/height 100% + object-fit：完整(contain) / 铺满(cover) 两种口径都由浏览器缩放，
       // 点击坐标再用同一套换算（见 imageRect），所以两种模式下点哪儿就是哪儿。
-      canvas: { display: 'block', width: '100%', height: '100%', touchAction: 'none', cursor: 'crosshair' },
+      // 光标用系统默认箭头（用户 m25412：原来写 crosshair，跟 PC 上看到的不一样、觉得奇怪）。
+      // 注意：这只是侧栏画布上的 CSS 光标；手机画面里若出现白色箭头，那是 Android 自己画的
+      // 指针图标（scrcpy 注入 SOURCE_MOUSE 滚动事件时系统会显示），跟这条 CSS 无关。
+      canvas: { display: 'block', width: '100%', height: '100%', touchAction: 'none', cursor: 'default' },
       empty: { padding: '1.2em', textAlign: 'center', color: V.soft, lineHeight: 1.8, fontSize: '1.02em' },
       pill: { padding: '0.14em 0.55em', borderRadius: 999, background: V.fill, borderStyle: 'solid', borderWidth: '1px', borderColor: V.lineStrong, fontSize: '0.86em', whiteSpace: 'nowrap', color: V.fg },
       pillOk: { background: 'rgba(46,204,113,0.18)', borderStyle: 'solid', borderWidth: '1px', borderColor: 'rgba(36,170,90,0.9)', fontWeight: 600 },

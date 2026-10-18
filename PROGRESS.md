@@ -1032,3 +1032,15 @@ Android 认为「pointerIndex 0 又按了一次」⇒ 整条事件丢弃，且 `
 1. **`edit` 事件只带片段**：从会话记录还原文件必须按 seq 重放 `write` + `edit`，只取 `edit.new_string` 会得到片段（第一版还原出来一堆 94B/152B 的假文件，就是这个坑）。
 2. **说「不删开发过程」就要落到文件系统层**：清理前先 `mv` 到 `archive/`，验收通过后再决定是否真删；`git init` 只能保护已提交的东西，删除发生在 init 之前就无能为力。
 3. 还原工具链留在 `archive/tools/`，以后同类误删可复用。
+### 补充：手机画面里的白色箭头是安卓系统指针，不是插件画的（m25412）
+
+用户反馈「手机界面的鼠标形状有点奇怪，白底时看不见」。
+
+源码核实（`scrcpy v5.0.1` `server/.../control/Controller.java`）：
+- 点击 / 拖拽 / 双指：`injectTouch()` 只在 `pointerId == POINTER_ID_MOUSE && (action == ACTION_HOVER_MOVE || 按着次要键)` 时才用 `SOURCE_MOUSE`，否则用 `SOURCE_TOUCHSCREEN` ⇒ **不会产生指针图标**。
+- **滚轮**：`injectScroll()`（`:623-645`）固定用 `InputDevice.SOURCE_MOUSE` + `ACTION_SCROLL` ⇒ **Android 系统自己在该位置画指针图标**（白色箭头，系统主题决定，需 root 才能换形状）。
+
+结论：
+1. 那个白箭头 = 系统 pointer icon，形状改不了；系统过几秒会自己隐藏，白底页面下确实容易看不见。
+2. 侧栏画布原来的 CSS 光标是 `crosshair`（十字），这才是「跟 PC 不一样」的那处，已改成系统默认箭头（`client.js` 的 `S.canvas`）。
+3. 若以后嫌白箭头碍眼，唯一彻底的办法是滚轮改回「手指拖动」注入（但会退回一卡一卡的手感），目前保持现状。
