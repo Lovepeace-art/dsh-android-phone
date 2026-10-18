@@ -4,6 +4,8 @@
 
 <p align="center"><b>把安卓真机搬进 DeepSeek Harness 的侧栏</b></p>
 
+<p align="center"><a href="README.md">中文</a> · <a href="README.en.md">English</a></p>
+
 ## 能力
 
 - 安装 dsh-better-sidebar 后**实时显示手机画面，不安装也可 ai 操作手机**
