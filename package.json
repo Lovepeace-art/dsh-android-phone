@@ -38,11 +38,11 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/CHANGE_ME/dsh-android-phone.git"
+    "url": "git+https://github.com/Lovepeace-art/dsh-android-phone.git"
   },
-  "homepage": "https://github.com/CHANGE_ME/dsh-android-phone#readme",
+  "homepage": "https://github.com/Lovepeace-art/dsh-android-phone#readme",
   "bugs": {
-    "url": "https://github.com/CHANGE_ME/dsh-android-phone/issues"
+    "url": "https://github.com/Lovepeace-art/dsh-android-phone/issues"
   },
   "os": [
     "win32"
