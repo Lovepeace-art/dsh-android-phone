@@ -24,29 +24,26 @@
 
 ## 安装
 
-把整个插件目录**复制**到本机任意位置，然后在目录里跑一次安装脚本。脚本以**复制**方式装进 DSH 的 profile（`~/.dsh/profiles/desktop/vendor/dsh-android-phone`）—— 不建指向源码目录的 junction，装完源码目录可以随便挪走或删掉：
+用 DSH 官方的安装入口，不需要跑脚本：
 
-```powershell
-# 在插件目录下执行（先用 -WhatIfOnly 可以只预览将要改动的内容）
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts\install.ps1 -Copy
-```
+1. DSH → **设置 → 插件 → 添加插件**
+2. 填**本地绝对路径**（插件目录，例如 `C:\Tools\dsh-android-phone`）；仓库 public 之后也可以填 Git 地址
+3. 安装（DSH 用自带 pnpm 完成依赖与注册）
+4. **重启 DSH**
 
-完整卸载（摘掉注册信息、依赖声明与附带 skill，不动你的手机和截图）：
+装完插件会出现在 DSH 的「插件」页（可在这里开关与配置）；装了 better-sidebar 时侧栏还会多出「手机」tab。
 
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts\install.ps1 -Uninstall
-```
-
-装完**重启 DSH**：插件会出现在 DSH 的「插件」页（可在这里开关与配置）；装了 better-sidebar 时侧栏还会多出「手机」tab。
+> 目前**没有发布到 npm**，所以「填包名」那条路暂时走不通 —— 用本地路径或 Git 地址。
+> 安装细节与卸载见 [使用说明 · 安装与卸载](docs/usage.md#安装与卸载)。
 
 ### 让 agent 帮你装
 
-把下面这段整段发给模型即可：
+把下面这段发给模型即可：
 
-> 在这台 Windows 机器上安装 DSH 插件 `dsh-android-phone`。插件目录是 `<把你解压/克隆出来的目录填这里>`。
-> 请按顺序做三件事：①在该目录下执行 `powershell -NoProfile -ExecutionPolicy Bypass -File scripts\install.ps1 -Copy`；②执行 `npm run doctor` 确认自检全绿，有 ❌ 就按提示修（缺 adb、手机没连、profile 没注册）；③告诉我结论，以及需要「重启 DSH」还是「刷新侧栏」。不要修改仓库里的代码文件。
-
-安装细节（脚本究竟改了哪些文件、为什么不能用 `dsh plugin add`、BOM 注意事项）见 [使用说明 · 安装与卸载](docs/usage.md#安装与卸载)。
+> 在这台 Windows 机器上安装 DSH 插件 `dsh-android-phone`，插件目录是 `<填你克隆出来的绝对路径>`。
+> 请用 DSH 的插件安装入口安装它（设置 → 插件 → 添加插件 → 本地路径），然后重启 DSH。
+> 装完执行 `npm run doctor` 确认自检全绿，有 ❌ 按提示修（缺 adb、手机没连、profile 未注册）。
+> 最后告诉我结论，以及需要「重启 DSH」还是「刷新侧栏」。不要修改仓库里的代码文件。
 
 ## 工作原理
 

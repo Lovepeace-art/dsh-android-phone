@@ -65,41 +65,31 @@
 
 画面是给模型/用户的**监视窗**：模型跑流程时能实时看到每一步；人操作的动作会标记 `by:'human'`，与模型区分。
 
-## 附带 skill（可选）
+## 技能（不在包内）
 
-`skills/jd-shop-longshot` —— 京东搜索关键字 → 切「店铺」tab → 进目标店铺 → 店铺首页长截图。
+插件包**不带业务流程技能**（`skills/` 故意留空）。技能属于流程与路径，按 DSH 官方设计应由用户或官方技能目录管理；
+塞进插件包会导致「插件升级覆盖用户技能」「profile 里写死插件绝对路径」这类问题。
 
-安装时会注册到 profile，也可以在聊天气泡里直接让模型用；还能脱离插件单独跑：
-
-```bash
-node skills/jd-shop-longshot/scripts/jd-shop-longshot.mjs --keyword 牛奶 --shop 每日鲜语
-```
-
-`skills/` 只是约定位置，插件能力不依赖任何 skill。删掉自带 skill（只留 `skills/README.md`）安装照样成功，只是不注册 skill 根。
-
-> 注册的是 **profile 里的副本**，不是仓库路径 —— 仓库搬家/删除都不会让技能静默消失。
-> 代价：改完 `skills/` 要重跑 `npm run install:profile` 再重启 DSH。
-> 跟别的 skill 根重名时自动改名 `<name>-2`（同时改 `SKILL.md` 的 `name:`），不会互相覆盖。
+想用这 12 个 `phone_*` 工具串流程，把 skill 放进你自己的技能目录即可。
+历史上有过一个 `jd-shop-longshot`（京东搜索 → 店铺 tab → 进店 → 店铺首页长截图），1.2.0 起移到包外维护。
 
 ## 安装与卸载
 
-### 安装脚本到底改了什么
+### 安装
 
-`scripts/install.ps1` 做四件事（都在 desktop profile 目录内，不改你的源码目录以外的任何东西）：
+用 DSH 官方入口（设置 → 插件 → 添加插件），三种来源：
 
-1. 把插件包放进 `<profile>\vendor\dsh-android-phone`（`-Copy` 自包含模式；开发时用默认的 link 模式，改仓库文件即时生效）
-2. 把包名 `dsh-android-phone` 写进 `<profile>\package.json` 的 `dsh.profile.bundles`
-3. 在同一个 `package.json` 的 `dependencies` 里声明该包
-4. 把 `skills/` 同步一份到 `<profile>\vendor\dsh-android-phone\skills`，并把该目录登记进 `cordis.patch.yml` 的 `customSkillDirs`（重名会自动加 `-2` 序号）
+- **本地绝对路径** —— 最常用，也最适合开发（装成链接后改代码重启即生效）
+- **Git 地址** —— 仓库公开后填 `https://github.com/Lovepeace-art/dsh-android-phone`
+- **包名** —— 需要先发布到 npm，目前未发布
 
-### 为什么不能用 `dsh plugin add`
+DSH 会自动完成依赖安装、写 `dsh.profile.bundles`、建 `node_modules` 链接，不需要额外脚本。装完**重启 DSH**。
 
-官方 `dsh plugin add` 会拒绝 desktop profile（报 "managed exclusively by the Electron application"），所以安装动作由脚本自己做。
+### 卸载
+
+设置 → 插件 → 移除该插件，然后重启 DSH。只会摘掉依赖与 bundle 注册，**不动手机、不动截图**。
 
 ### 注意事项
 
-- **`install.ps1` 必须保持 UTF-8 BOM**：Windows PowerShell 5.1 读无 BOM 的 `.ps1` 会按 ANSI 解码，中文变乱码并报一堆假的 `Missing closing '}'`。
-- 改完 `skills/` 要重跑一次安装脚本，profile 里的副本才会更新。
-- 装完想确认环境是否齐备：`npm run doctor`（10 项只读自检：Node / 平台 / vendor 里的 adb 与 scrcpy-server / adb 可用性与版本 / 设备在线 / 屏幕参数 / 截图目录可写 / profile junction 指向本仓库 / bundles 已注册 / skill 根已并入）。
-- 卸载只摘注册信息、依赖声明和 profile 里的副本，**不动手机、不动截图**。
-- 预览要改什么：给脚本加 `-WhatIfOnly`。
+- 装完确认环境是否齐备：`npm run doctor`（只读自检：Node / 平台 / vendor 里的 adb 与 scrcpy-server / adb 可用性与版本 / 设备在线 / 屏幕参数 / 截图目录可写 / profile 里指向本仓库 / bundles 已注册）。
+- 本机装成**指向仓库的链接**时，改仓库文件重启即生效，不用重装；只在换机器、挪仓库、改包名、profile 重建时才需要重装。

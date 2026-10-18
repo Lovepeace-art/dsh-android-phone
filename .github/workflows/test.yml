@@ -13,9 +13,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # 只跑 Windows：package.json 声明了 "os": ["win32"]（插件用 install.ps1 装进
-        # DSH desktop profile，vendor 里是 adb.exe / AdbWinApi.dll，本来就只有 Windows 版），
-        # 在 linux runner 上 `npm install` 会直接 EBADPLATFORM 退出，跑了也没有意义。
+        # 只跑 Windows：package.json 声明了 "os": ["win32"]（插件依赖随包的 adb.exe /
+        # AdbWinApi.dll，本来就只有 Windows 版），在 linux runner 上 `npm install`
+        # 会直接 EBADPLATFORM 退出，跑了也没有意义。
         os: [windows-latest]
         # 只跑 22 / 24：测试依赖 jsdom 依赖的 undici 需要 zlib.createZstdDecompress，
         # 那是 Node 22.15+ 才有的 API，Node 20 上 jsdom 加载即失败。
@@ -33,8 +33,8 @@ jobs:
       - name: 安装测试依赖
         run: npm install --no-audit --no-fund
 
-      # npm run ci = 静态校验（node --check 全量 + install.ps1 BOM/LF + gitattributes
-      # + git 索引无调试产物）+ 离线回归。与本地 `npm run ci` 完全一致。
+      # npm run ci = 静态校验（node --check 全量 + gitattributes + git 索引无调试产物）
+      # + 离线回归（拼接 + 侧栏）。与本地 `npm run ci` 完全一致。
       - name: 静态校验 + 离线回归（不需要真机）
         run: npm run ci
 

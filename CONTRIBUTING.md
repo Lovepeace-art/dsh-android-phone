@@ -27,7 +27,7 @@
 ```powershell
 npm install                 # 离线测试依赖（react / react-dom / jsdom）
 npm run hooks               # 启用 .githooks（仅本机生效，不随仓库传播）
-npm run install:profile     # 装进 DSH profile
+# 用 DSH 插件页安装本仓库（设置 → 插件 → 添加插件 → 本地路径）
 ```
 
 装完重启 DSH，侧栏出现「📱 手机」tab（需要 better-sidebar）或「插件」页里能改设置（不需要 better-sidebar）。
@@ -40,10 +40,10 @@ npm run install:profile     # 装进 DSH profile
 |---|---|
 | `client.js` | **Ctrl+Shift+R** 硬刷新侧栏 |
 | `index.js` / `src/**` / `cordis.patch.yml` | **重启 DSH** |
-| `skills/**` / `actions/**` | `npm run install:profile` 后重启 DSH |
+| `actions/**` | 重启 DSH |
 | `README` / `test/**` / `AGENTS.md` | 不用管 |
 
-profile 里装的是**指向本仓库的 junction**，所以改完仓库文件就生效，不用重装。只有这几种情况需要重跑 `npm run install:profile`：换机器、挪了仓库目录、改了 `package.json` 的 `name`、profile 的 `node_modules` 被删了。
+profile 里装的是**指向本仓库的链接**（DSH 插件页安装本地目录时由 pnpm 建立），所以改完仓库文件就生效、不用重装。只有这几种情况需要重新安装：换机器、挪了仓库目录、改了 `package.json` 的 `name`、profile 的 `node_modules` 被删了。
 
 > 注意：`git checkout` 切分支或回滚会**立刻**改变 DSH 正在加载的代码，切完记得重启 DSH 再验收。
 
@@ -64,7 +64,7 @@ npm run test:device   # 真机回归（会占用手机）
 
 - **不引入运行时依赖**。插件运行时零 npm 依赖；`devDependencies` 只给测试用。
 - **`client.js` 是单文件**。DSH 的 `__ModuleLoader__` 只加载一个 factory，不能用 JSX / TypeScript / `import`，只能用 `React.createElement`（代码里的 `h`）。
-- **`scripts/install.ps1` 必须 UTF-8 BOM + LF**。Windows PowerShell 5.1 读无 BOM 的 `.ps1` 会按 ANSI 解码，中文变乱码并报一堆假的 `Missing closing '}'`。`npm run ci` 会检查这一点。
+- **不要往 `skills/` 里塞业务流程技能**。插件包只提供能力；只有"插件运行必需的技能"才放，且必须走官方 `ctx.skills.registerProvider`（见 `skills/README.md`）。
 - **协议以源码为准**。控制消息 / 帧头的字节布局以 scrcpy v5.0.1 的 `ref/` 源码为依据，不要凭记忆改；改了要在 PR 里说明依据。
 - **不要提交构建/调试产物**：`test/reports/`、`recon/`、`out/`、`*.bak-*`、`PROBE-*` 都已在 `.gitignore`。
 - **`vendor/` 里的二进制不做修改**，升级请整包替换并在 PR 里注明来源与版本。

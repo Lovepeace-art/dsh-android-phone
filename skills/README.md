@@ -1,26 +1,35 @@
 # skills/
 
-插件自带的 skill 放在这里，每个 skill 一个子目录，子目录里必须有 `SKILL.md`：
+**这个目录默认是空的**，故意留空。
 
+## 为什么空
+
+插件包只负责**能力**（见 `src/`、`index.js`），业务流程与路径属于 skill。
+按 DSH 的官方设计，skill 应该由用户或官方技能目录管理，而不是塞进插件包里 ——
+否则会出现「插件一升级就把用户的技能覆盖掉」「profile 里写死插件绝对路径」这类问题。
+
+## 什么情况下才该放东西进来
+
+只有一种：**插件运行必需的技能**（缺了它插件就不可用，且没有任何外部替代）。
+目前没有。真需要时用官方机制注册，不要改 profile 的 `customSkillDirs`：
+
+```js
+// 参考 @deepseek-ai/dsh-skill-office/lib/index.js
+const inject = ['skills'];
+function apply(ctx) {
+  ctx.inject(['skills'], (s) => s.skills.registerProvider(() => provider));
+}
 ```
-skills/
-└─ <skill-name>/
-   ├─ SKILL.md          # 必须有：frontmatter 的 name / description / whenToUse + 正文
-   └─ scripts/          # 可选：配套脚本
-```
 
-安装时 `install.ps1` 会把 **`<插件目录>\skills` 同步一份**到 profile 的
-`<profile>\vendor\dsh-android-phone\skills`，再登记进
-`skill-filesystem` → `customSkillDirs`，所以放进来就会被 DSH 发现。
+provider 形状与硬约束（来自 `@deepseek-ai/dsh-skill` 的校验代码）：
 
-- 注册的是 **profile 里的副本**：仓库搬家/删除都不影响技能
-- 改完要**重跑一次 `npm run install:profile`**（重新同步），再重启 DSH
-- 跟别的 skill 根重名会自动改名成 `<name>-2` 并同步改 `SKILL.md` 的 `name:`
+- `{ name, list(): Promise<Candidate[]>, get(candidate, { signal }): Promise<{ ...summary, content }> }`
+- Candidate 必填：`name` / `description` / `source`(string) / `rank`(有限数字，否则抛错)
+- 可选：`invocation`（给了就要两个 boolean 都有）/ `whenToUse` / `resourceBase` / `locator`
+- 排序：`rank → providerOrder → localOrder`；`RUNTIME_RANK = 250`、`BUNDLED_SKILL_RANK = 600`
+- provider 模式下没有「当前技能目录」可让模型自己找，**脚本路径必须由正文给出绝对路径**
 
-## 这个目录可以是空的
+## 想给这个插件写业务流程 skill
 
-`skills/` 只是约定位置，插件能力（12 个 `phone_*` 工具 + 18 个 HTTP 接口）
-**完全不依赖任何 skill**。没有 skill 时安装脚本会打印
-「插件包没自带 skill —— 只装插件，不注册 skill 根」并照常完成安装。
-
-自带的 skill 属于示例 / 业务定制，可以整个删掉，只留这个 `README.md` 占位。
+放到 DSH 自己的技能目录里，用 12 个 `phone_*` 工具当积木，别往这个仓库塞。
+例子见 git 历史里的 `jd-shop-longshot`（1.2.0 之前随包发布，之后移出）。

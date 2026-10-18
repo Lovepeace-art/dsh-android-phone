@@ -35,11 +35,10 @@ DSH（DeepSeek Harness）插件：把安卓真机搬进 DSH 侧栏（实时画�
 | `src/core/attach.js` | 截图落盘 + 附件登记 | `saveShot()` |
 | `src/core/preview.js` | 生成预览缩图 | `needsPreview()`、`makePreviewPng()` |
 | `actions/*.json` | 预置动作序列（`phone_preset` 读取） | `jd.json` |
-| `skills/<name>/` | 可选 skill；安装时**复制**到 profile 并登记 | `SKILL.md` |
+| `skills/` | **默认空**：插件不带业务流程技能；只有"插件运行必需"才放 `<name>/SKILL.md` 并走官方 provider | — |
 | `test/` | 6 个套件，离线 2 + 真机 4 | 见 §5 |
-| `scripts/install.ps1` | 装进 DSH profile（junction + bundles + dependency + skill 根） | 参数 `-WhatIfOnly/-Copy/-Uninstall` |
 | `scripts/doctor.mjs` | 10 项只读自检 | `npm run doctor` |
-| `scripts/check.mjs` | 静态校验（语法 / `install.ps1` 编码 / `.gitattributes`） | `npm run check` |
+| `scripts/check.mjs` | 静态校验（语法 / 注释吞代码 / `.gitattributes` / 无调试产物） | `npm run check` |
 | `vendor/` | 随包二进制：platform-tools 37.0.1、scrcpy-server v5.0.1 | 原样分发，不改 |
 | `cordis.patch.yml` | 插件默认配置（adb 路径、起流参数） | — |
 | `docs/` | 使用文档：`usage`（怎么用）/ `tools`（工具与接口）/ `protocol`（原理与协议）/ `troubleshooting`（排障）。**README 只留概览，细节进 docs** | — |
@@ -58,9 +57,9 @@ DSH（DeepSeek Harness）插件：把安卓真机搬进 DSH 侧栏（实时画�
 
 ## 4. 硬约定（违反会静默出错，不是崩溃）
 
-1. **`install.ps1` 必须 UTF-8 BOM + LF**。Windows PowerShell 5.1 读无 BOM 的 `.ps1` 按 ANSI(CP936) 解码，
-   中文变乱码并报一堆假的 `Missing closing '}'`。`npm run check` 会校验前 3 字节是否为 `EF BB BF` 且无 CRLF。
-   改这个文件要用「读全文 → 字符串替换 → 以 `UTF8Encoding($true)` 写回」，不要用会丢 BOM 的编辑器/工具直接覆盖。
+1. **`skills/` 保持空**。插件包不带业务流程技能：技能属于流程与路径，按官方设计应由用户或官方技能目录管理。
+   真需要"插件运行必需"的技能时，用官方 `ctx.skills.registerProvider`（`inject: ['skills']`，Candidate 必须带有限数字 `rank`），
+   参考 `@deepseek-ai/dsh-skill-office`；**不要改 profile 的 `customSkillDirs`**，那会把插件绝对路径写死进用户 profile。
 2. **`client.js` 是单文件**：不能用 JSX / TypeScript / `import` / `export`，只能 `React.createElement`
    （代码里简称 `h`）；只能通过 factory 的参数 `require` 取 `react`。样式集中在文件顶部的 `S` 与调色板
    `V`（CSS 变量 `--dshp-*`，深浅主题由宿主父元素颜色派生）。
@@ -86,8 +85,7 @@ DSH（DeepSeek Harness）插件：把安卓真机搬进 DSH 侧栏（实时画�
 
 - 改 `client.js` → `node --check client.js` + `npm test`；UI 改动附截图（Ctrl+Shift+R 后看真实侧栏）
 - 改 `index.js` / `src/**` → `npm run ci`；协议层改动补 `npm run test:device`（真机）
-- 改 `scripts/install.ps1` → `npm run check`（BOM/LF）+ `powershell -NoProfile -ExecutionPolicy Bypass -File scripts\install.ps1 -WhatIfOnly` 干跑
-- 改 `skills/**` → `npm run install:profile` 后重启 DSH 验证技能可见
+- 改 `actions/**` → 重启 DSH；**不要往 `skills/` 里塞业务流程技能**（见 `skills/README.md`）
 - 改了对外接口（工具名/参数/HTTP 路由） → 同步 `docs/tools.md` 的工具表与接口列表，`CHANGELOG.md` 记一笔
 - 改了使用方式（手势/设置项/默认值） → 同步 `docs/usage.md`；README 保持简短，别再往回塞细节
 - 发版 → `package.json` 的 `version`、`CHANGELOG.md` 加小节、打 tag
@@ -96,7 +94,7 @@ DSH（DeepSeek Harness）插件：把安卓真机搬进 DSH 侧栏（实时画�
 
 | 命令 | 覆盖 | 需要真机 |
 |---|---|---|
-| `npm test` | `test-stitch`（35 项，逐像素拼接）+ `test-client`（86 项，侧栏 UI/键盘/剪贴板/设置/打开 App） | 否 |
+| `npm test` | `test-stitch`（35 项，逐像素拼接）+ `test-client`（93 项，侧栏 UI / 键盘含 Ctrl+A / 剪贴板 / 设置 / 打开 App） | 否 |
 | `npm run test:device` | `test-plugin-tools`（工具与编码）+ `test-session`（单会话长跑）+ `test-host`（HTTP）+ `test-e2e-jd`（京东全链路） | **是** |
 
 真机测试会抢手机焦点、打开设置/京东等 App。跑之前把手机放一边；别在登着他人账号的手机上走到购买/支付路径；
@@ -113,8 +111,7 @@ DSH（DeepSeek Harness）插件：把安卓真机搬进 DSH 侧栏（实时画�
 8. **`ps -A` 里看不到 scrcpy server** → 进程名是 `app_process`（不是类名），别拿类名当存活判据；用抽象 socket 是否存在判断。
 9. **`adb reverse --remove tcp:<port>` 删不掉映射** → 必须按 `localabstract:scrcpy_*` 删；启动前用 `sweepScrcpyReverseSync()` 清残留。
 10. **静止画面 fps 低** → 虚拟显示只在内容变化时出帧，5~6fps 是正常的，不要试图「补帧」。
-11. **`edit`/`write` 工具会丢 BOM** → 改完 `.ps1` 用 `UTF8Encoding($true)` 重写并验证前 3 字节（§4.1）。
-12. **`.NET` 文件 API 用进程 CWD，不认 PowerShell 的 `Set-Location`** → 脚本里一律用绝对路径。
+11. **`.NET` 文件 API 用进程 CWD，不认 PowerShell 的 `Set-Location`** → 脚本里一律用绝对路径。
 
 ## 7. 不要做
 

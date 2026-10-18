@@ -4,7 +4,7 @@
  *
  * 检查四件事，都是本项目真实踩过的坑：
  *   1. 所有 .js / .mjs 能通过 `node --check`（语法错误不该等到跑起来才发现）
- *   2. scripts/install.ps1 是 UTF-8 BOM + LF（PowerShell 5.1 否则按 ANSI 解码，中文全乱）
+ *   2. scripts/install.ps1（若存在）是 UTF-8 BOM + LF；1.2.0 起该文件已移除，安装交给 DSH 插件页
  *   3. .gitattributes 里那两条关键规则还在（*.ps1 -text、源码 LF）
  *   4. git 索引里没有混进调试产物（PROBE-* / recon/ / out/ / *.bak-* / test/reports/）
  *
@@ -53,18 +53,19 @@ for (const file of walk(ROOT)) {
 if (syntaxErrors.length === 0) pass(`语法：${checked} 个 .js/.mjs 通过 node --check`);
 else fail(`语法：${syntaxErrors.length} 个文件有语法错误`, syntaxErrors.join('\n\n'));
 
-// ── 2. install.ps1 编码 ────────────────────────────────────
+// ── 2. install.ps1 编码（安装已交给 DSH 插件页；文件不存在则跳过） ──
 const ps1 = join(ROOT, 'scripts', 'install.ps1');
-try {
-  const buf = readFileSync(ps1);
-  const hasBom = buf.length >= 3 && buf[0] === 0xef && buf[1] === 0xbb && buf[2] === 0xbf;
-  const text = buf.toString('utf8');
+let ps1buf = null;
+try { ps1buf = readFileSync(ps1); } catch { /* 文件不存在 = 正常 */ }
+if (!ps1buf) {
+  pass('install.ps1：已移除（安装交给 DSH 插件页），跳过编码校验');
+} else {
+  const hasBom = ps1buf.length >= 3 && ps1buf[0] === 0xef && ps1buf[1] === 0xbb && ps1buf[2] === 0xbf;
+  const text = ps1buf.toString('utf8');
   const crlf = (text.match(/\r\n/g) || []).length;
   if (!hasBom) fail('install.ps1：缺少 UTF-8 BOM（PowerShell 5.1 会把中文读成乱码）');
   else if (crlf > 0) fail(`install.ps1：含 ${crlf} 处 CRLF，应为 LF`);
   else pass('install.ps1：UTF-8 BOM + LF 正常');
-} catch (e) {
-  fail('install.ps1：读取失败', e.message);
 }
 
 // ── 3. .gitattributes 关键规则 ─────────────────────────────

@@ -174,15 +174,17 @@ async function main() {
   step('killStrayServerSync 已导出（退出兜底）', typeof (await import('../src/android/video.js')).killStrayServerSync === 'function', '');
   step('sweepScrcpyReverseSync 已导出（清理 adb reverse 泄漏，坑 13）', typeof (await import('../src/android/video.js')).sweepScrcpyReverseSync === 'function', '');
 
-  // 坑 14 的防回归：install.ps1 必须是带 BOM 的 UTF-8，且不得用默认编码的 Get-Content 读用户文件
-  {
-    const ps1 = join(root, 'scripts', 'install.ps1');
-    const raw = readFileSync(ps1);
-    const hasBom = raw.length > 3 && raw[0] === 0xef && raw[1] === 0xbb && raw[2] === 0xbf;
-    step('install.ps1 带 UTF-8 BOM（否则 PS 5.1 会把中文读坏、报假的语法错，坑 11/14）', hasBom, hasBom ? 'EF BB BF ✓' : `首字节 ${raw[0].toString(16)} ${raw[1].toString(16)} ${raw[2].toString(16)}`);
-    const src = raw.toString('utf8');
+  // 坑 14 的防回归：install.ps1 若还在，必须是带 BOM 的 UTF-8（1.2.0 起该文件已移除，安装交给 DSH 插件页）
+  let ps1raw = null;
+  try { ps1raw = readFileSync(join(root, 'scripts', 'install.ps1')); } catch { /* 已移除 = 正常 */ }
+  if (ps1raw) {
+    const hasBom = ps1raw.length > 3 && ps1raw[0] === 0xef && ps1raw[1] === 0xbb && ps1raw[2] === 0xbf;
+    step('install.ps1 带 UTF-8 BOM（坑 11/14）', hasBom, hasBom ? 'EF BB BF ✓' : '缺 BOM');
+    const src = ps1raw.toString('utf8');
     const badReads = src.split(/\r?\n/).filter((l) => /Get-Content\s/.test(l) && !/Encoding/.test(l) && !/^\s*#/.test(l));
-    step('install.ps1 里没有「默认编码 Get-Content」（会把 UTF-8 中文写成乱码）', badReads.length === 0, badReads.join(' | ').slice(0, 160));
+    step('install.ps1 里没有「默认编码 Get-Content」', badReads.length === 0, badReads.join(' | ').slice(0, 160));
+  } else {
+    step('install.ps1 已移除（1.2.0 起安装交给 DSH 插件页）', true, 'skipped');
   }
 
   // 收尾：把自测里可能起来的会话停掉

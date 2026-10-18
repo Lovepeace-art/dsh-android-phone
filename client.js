@@ -1244,7 +1244,6 @@ window.__ModuleLoader__.load({
       const devices = status?.devices || [];
       const dev = status?.device || {};
       const scr = status?.screen || {};
-      const fg = status?.foreground || {};
       const online = devices.filter((d) => d.state === 'device').length;
 
       // 没画面时给出「为什么」+「怎么做」，不再留一片空白让人猜
@@ -1374,9 +1373,8 @@ window.__ModuleLoader__.load({
         h('span', {}, `画面 ${Math.round(videoStats.fps || 0)} fps`),
         h('span', {}, `${Math.round((videoStats.kbps || 0) / 10) / 100} Mbps`),
         h('span', { style: S.pill }, videoStats.mode === 'video' ? 'H.264' : '快照'),
-        h('span', { style: S.pill, 'data-enc': '1', title: '视频编码尺寸（H.264 解码后的像素）' }, status?.video?.width ? `编码 ${status.video.width}×${status.video.height}` : (status?.session?.restarts ? `重启 ${status.session.restarts} 次` : '未起流')),
+        h('span', { style: S.pill, 'data-enc': '1', title: '视频尺寸（H.264 解码后的像素）' }, status?.video?.width ? `${status.video.width}×${status.video.height}` : (status?.session?.restarts ? `重启 ${status.session.restarts} 次` : '未起流')),
         videoStats.decodeMs ? h('span', { style: S.pill, 'data-decode': String(Math.round(videoStats.decodeMs)) }, `解码 ${Math.round(videoStats.decodeMs)}ms`) : null,
-        fg.package ? h('span', { style: S.pill }, `前台 ${String(fg.package).split('.').pop()}`) : null,
         busy ? h('span', { style: S.pill }, `${busy}…`) : null,
       );
 

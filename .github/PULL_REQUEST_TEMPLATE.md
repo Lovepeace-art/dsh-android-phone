@@ -24,7 +24,7 @@
 ## 检查清单
 
 - [ ] 改 `client.js` 时：仍是单文件、无 JSX/TypeScript/`import`
-- [ ] 改 `scripts/install.ps1` 时：仍是 UTF-8 BOM + LF（`npm run check` 已校验）
+- [ ] 没往 `skills/` 里塞业务流程技能（只有"插件运行必需"才放，且走官方 provider）
 - [ ] 协议相关改动注明了依据（`ref/` 里对应的 scrcpy v5.0.1 源码文件与行号）
 - [ ] 改了对外接口（工具名/参数/HTTP 路由）→ 已同步 `docs/tools.md`；改了使用方式 → 已同步 `docs/usage.md`
 - [ ] 已读 [CONTRIBUTING.md](../CONTRIBUTING.md)，硬约定见 [AGENTS.md](../AGENTS.md)

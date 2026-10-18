@@ -34,7 +34,7 @@ add(process.platform === 'win32', `平台 Windows（当前 ${process.platform}�
 // ── 2. 随包二进制 ────────────────────────────────────────────
 const vendorAdb = join(ROOT, 'vendor', 'platform-tools', 'adb.exe');
 const vendorServer = join(ROOT, 'vendor', 'scrcpy-server');
-add(existsSync(vendorAdb), 'vendor/platform-tools/adb.exe 存在', existsSync(vendorAdb) ? `${(statSync(vendorAdb).size / 1048576).toFixed(1)}MB` : '重新下载仓库或用 -Copy 安装');
+  add(existsSync(vendorAdb), 'vendor/platform-tools/adb.exe 存在', existsSync(vendorAdb) ? `${(statSync(vendorAdb).size / 1048576).toFixed(1)}MB` : '仓库不完整：重新克隆，或用 DSH 插件页重装');
 add(existsSync(vendorServer), 'vendor/scrcpy-server 存在', existsSync(vendorServer) ? `${statSync(vendorServer).size} 字节` : '缺失会导致起流失败');
 
 // ── 3. adb 可用性（按插件同样的查找顺序） ────────────────────
@@ -125,11 +125,11 @@ if (existsSync(profilesDir)) {
   }
 }
 if (installed) {
-  add(installed.linked, `profile 里指向本仓库（${installed.prof}）`, installed.linked ? installed.dir : `junction 不存在或指向别处：跑 npm run install:profile`);
-  add(installed.bundled, '已注册进 dsh.profile.bundles', installed.bundled ? '' : '跑 npm run install:profile');
+  add(installed.linked, `profile 里指向本仓库（${installed.prof}）`, installed.linked ? installed.dir : '链接不存在或指向别处：用 DSH 插件页重新安装（设置 → 插件 → 添加插件）');
+  add(installed.bundled, '已注册进 dsh.profile.bundles', installed.bundled ? '' : '用 DSH 插件页重新安装一次');
 
 } else {
-  add(false, '没找到 DSH desktop profile', `${profilesDir} 不存在：DSH 装了吗？装好后跑 npm run install:profile`);
+  add(false, '没找到 DSH desktop profile', `${profilesDir} 不存在：DSH 装了吗？装好后用 DSH 插件页安装本插件`);
 }
 
 

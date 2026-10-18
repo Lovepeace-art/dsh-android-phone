@@ -528,9 +528,14 @@ check('分辨率胶囊只显示手机物理分辨率，hover 里只有「型号 
   resPill ? `${resPill.textContent} | ${resPill.getAttribute('title')}` : '没有胶囊');
 
 const encPill = container.querySelector('[data-enc]');
-check('视频编码尺寸挪到底部状态行（data-enc，和 fps 同一行）',
-  !!encPill && /编码|未起流|重启/.test(encPill.textContent),
-  encPill ? encPill.textContent : '没有编码胶囊');
+const encTxt = (encPill?.textContent || '').trim();
+check('底部状态行只显示尺寸，不再有「编码」二字（hover 说明是视频尺寸）',
+  !!encPill && !/编码/.test(encTxt) && (/^\d+×\d+$/.test(encTxt) || /未起流|重启/.test(encTxt))
+    && /视频尺寸/.test(encPill.getAttribute('title') || ''),
+  encPill ? `${encTxt} | ${encPill.getAttribute('title')}` : '没有尺寸胶囊');
+check('状态行不再显示「前台 xxx」（2026-10-19 用户要求删掉）',
+  !/前台 \S/.test(container.textContent || ''),
+  '');
 
 const ownerPill = container.querySelector('[data-owner]');
 const owner0 = ownerPill?.getAttribute('data-owner');

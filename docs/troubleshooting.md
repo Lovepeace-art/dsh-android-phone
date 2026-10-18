@@ -6,7 +6,7 @@
 npm run doctor
 ```
 
-10 项只读检查：Node 版本、平台、`vendor` 里的 adb 与 scrcpy-server、adb 是否可用及其版本、设备是否在线、分辨率与密度、截图目录是否可写、profile 里的 junction 指向、bundle 是否注册、skill 根是否并入。哪项 ❌ 就照着修。
+10 项只读检查：Node 版本、平台、`vendor` 里的 adb 与 scrcpy-server、adb 是否可用及其版本、设备是否在线、分辨率与密度、截图目录是否可写、profile 里是否指向本仓库、bundle 是否已注册。哪项 ❌ 就照着修。
 
 ## adb 查找顺序
 
@@ -23,15 +23,14 @@ npm run doctor
 | adb 起不来，报 `cannot open %TEMP%\adb.log: Permission denied` | 把 `TEMP`/`TMP` 指到可写目录再 `adb start-server` |
 | 画面黑屏、没有 fps | 看状态行：`未起流` → 点「起流」；有 fps 但不动 → 静止页面本来只有 5~6fps |
 | 画面停在最后一帧、fps 仍显示 | 流断了但没重连。硬刷新侧栏（Ctrl+Shift+R）。连续 8 次重连失败会自动降级成快照模式 |
-| 点了没反应，但 `adb shell input tap` 有效 | 控制权在人手上（顶栏「✋ 人在操作」）→ 点「↩ 交还模型」；或坐标空间不对（见 [协议](protocol.md#坐标空间)） |
+| 点了没反应，但 `adb shell input tap` 有效 | 顶栏胶囊显示「人已接管」→ 停止操作画面，静默 90 秒后自动交还模型；或坐标空间不对（见 [协议](protocol.md#坐标空间)） |
 | 输不进去中文 | 走 `adb` 的命令行输入只支持 ASCII；用控制通道的 `INJECT_TEXT`（`phone_keyboard` 默认走这条，≤300 字节自动分段） |
 | 键盘按键没反应 | 先点一下画面让面板获得焦点；若焦点在面板自己的输入框里，按键会留给输入框不送手机 |
 | 打开 App 下拉里没有想用的 | 下拉只列设置里保存过的候选，去 `⚙ 设置 → ④ 打开 App → 从手机添加` |
 | 长截图重复 / 接缝 | 吸顶、懒加载、倒计时动画会少量错位。先滚到页面顶部再触发；页面有无限流时容易在底部反复 |
-| 安装脚本报一堆假的 `Missing closing '}'` | `install.ps1` 的 UTF-8 BOM 丢了（被编辑器/工具覆盖）。`git checkout -- scripts/install.ps1` 还原 |
 | 改完代码没生效 | 改 `client.js` 要 Ctrl+Shift+R；改 `index.js`/`src/**` 要重启 DSH。见 [CONTRIBUTING](../CONTRIBUTING.md#改哪里怎么生效) |
 | 侧栏没有「📱 手机」tab | 没装 `dsh-better-sidebar`。此时没有面板，但设置项在 DSH「插件」页里，模型工具照常可用 |
-| 重启 DSH 后插件不见了 | profile 的 junction 失效（挪了仓库目录 / 删了 `node_modules`）→ 重跑 `npm run install:profile` |
+| 重启 DSH 后插件不见了 | 链接装法下仓库目录被挪走/删了，或 profile 的 `node_modules` 被清 → 用 DSH 插件页重新安装一次 |
 
 ## 收集诊断信息
 

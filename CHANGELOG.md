@@ -2,6 +2,26 @@
 
 本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## 1.2.0 — 2026-10-18
+
+### 移除（破坏性）
+
+- **移除 `scripts/install.ps1`**（连带 `npm run install:profile` / `uninstall:profile`）。安装改走 DSH 官方入口：
+  **设置 → 插件 → 添加插件 → 本地路径 / Git 地址**，由 DSH 自带 pnpm 完成依赖、`dsh.profile.bundles` 注册与链接。
+- **`skills/` 默认留空**。插件包不再随附业务流程技能（`jd-shop-longshot` 移到包外维护）。技能属于流程与路径，
+  按官方设计应由用户或官方技能目录管理；塞进插件包会导致「插件升级覆盖用户技能」「profile 里写死插件绝对路径」。
+
+### 变更
+
+- README 与 `docs/usage.md` 的安装段只保留官方安装方式；`docs/troubleshooting.md`、`CONTRIBUTING.md`、`AGENTS.md`、
+  Issue / PR 模板里与 `install.ps1`、`customSkillDirs`、技能重名改号相关的内容全部清理。
+- `npm run check` 的 install.ps1 编码校验改为「文件存在才校验」；`doctor` 的安装提示改为「用 DSH 插件页重新安装」。
+- 状态行去掉「前台 xxx」与「编码」二字（悬停提示仍在）。
+
+### 老用户升级
+
+`git pull` 后重启 DSH 即可。如果本机 profile 里还留着 `<profile>\vendor\dsh-android-phone\skills` 副本
+与 `cordis.patch.yml` 的 `customSkillDirs` 条目，删掉那一行并删掉该目录（否则同名技能可能出现两次）。
 ## 1.1.1 — 2026-10-18
 
 ### 新增

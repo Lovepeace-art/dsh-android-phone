@@ -59,7 +59,7 @@ export function resolveServerJar(explicit) {
   const cands = [];
   if (explicit) cands.push(explicit);
   if (process.env.DSH_SCRCPY_SERVER) cands.push(process.env.DSH_SCRCPY_SERVER);
-  // 插件自带（install.ps1 会把 vendor/ 一起装上；这是换机器后唯一可靠的位置）
+  // 插件自带（vendor/ 随包分发，装到 profile 时一起带过去；这是换机器后唯一可靠的位置）
   try { cands.push(fileURLToPath(new URL('../../vendor/scrcpy-server', import.meta.url))); } catch { /* ignore */ }
   const adb = resolveAdb();
   if (adb) cands.push(join(dirname(adb), 'scrcpy-server'));

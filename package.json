@@ -1,6 +1,6 @@
 {
   "name": "dsh-android-phone",
-  "version": "1.1.1",
+  "version": "1.2.0",
   "description": "DSH 侧栏里的安卓真机：scrcpy 实时画面 + 亚毫秒控制通道 + 截屏/长截图，并把手机操作能力作为工具交给模型",
   "icon": "assets/icon.png",
   "type": "module",
@@ -17,7 +17,6 @@
     "client.js",
     "src",
     "actions",
-    "scripts/install.ps1",
     "scripts/doctor.mjs",
     "skills",
     "vendor",
@@ -72,9 +71,7 @@
     "test": "node test/test-stitch.mjs && node test/test-client.mjs",
     "test:offline": "node test/test-stitch.mjs && node test/test-client.mjs",
     "test:device": "node test/test-plugin-tools.mjs && node test/test-session.mjs && node test/test-host.mjs && node test/test-e2e-jd.mjs",
-    "doctor": "node scripts/doctor.mjs",
-    "install:profile": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/install.ps1",
-    "uninstall:profile": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/install.ps1 -Uninstall"
+    "doctor": "node scripts/doctor.mjs"
   },
   "devDependencies": {
     "jsdom": "^30.1.3",
