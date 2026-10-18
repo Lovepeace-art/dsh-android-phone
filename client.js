@@ -819,6 +819,20 @@ window.__ModuleLoader__.load({
 
     /* ---------------------------------------------------------------- 面板 */
 
+    // 工具栏「▶ 打开」的候选 App 缓存：设置页读写后刷新，避免每次渲染都发请求。
+    let APPS_CACHE = null;
+    async function fetchSettings(ctx) {
+      try {
+        const r = await fetch(`\${apiBase(ctx)}/settings`, {
+          method: 'POST', cache: 'no-store',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'get' }),
+        });
+        const j = await r.json();
+        if (j && j.ok) { APPS_CACHE = j; return j; }
+      } catch { /* 读不到就用上次的 */ }
+      return APPS_CACHE;
+    }
     function Panel(props) {
       const { ctx } = props;
       const api = useMemo(() => ({ base: apiBase(ctx) }), [ctx]);
@@ -831,7 +845,20 @@ window.__ModuleLoader__.load({
       const [shot, setShot] = useState(null);
       // 画面模式：cover 铺满（默认）/ contain 完整（「全屏」「大窗口」两条路 2026-10-18 用户拍板删掉）
       const [view, setView] = useState('cover');
-      const [showSettings, setShowSettings] = useState(false);   // ⚙ 设置页（截图地址 / 自动清理 / skill）
+      const [showSettings, setShowSettings] = useState(false);
+      // 工具栏「▶ 打开」的候选 App（用户 2026-10-18：候选可配置，默认 6 个）。设置页加载/保存后会刷新。
+      const [apps, setApps] = useState(() => (APPS_CACHE && APPS_CACHE.settings && Array.isArray(APPS_CACHE.settings.apps) ? APPS_CACHE.settings.apps : []));
+      const [launchPkg, setLaunchPkg] = useState(() => (APPS_CACHE && APPS_CACHE.settings && APPS_CACHE.settings.launchPkg) || JD_PACKAGE);
+      useEffect(() => {
+        if (showSettings) return undefined;   // 设置页开着时不抢它的请求
+        let dead = false;
+        fetchSettings(ctx).then((j) => {
+          if (dead || !j || !j.settings) return;
+          setApps(Array.isArray(j.settings.apps) ? j.settings.apps : []);
+          setLaunchPkg(j.settings.launchPkg || JD_PACKAGE);
+        });
+        return () => { dead = true; };
+      }, [showSettings]);   // ⚙ 设置页（截图地址 / 自动清理 / skill）
       const [running, setRunning] = useState(true);
       // 截图机：idle（灰）→ 单击截一张 → armed（绿，5 秒内按 L 开始长截图）→ capturing（⏹ 停止）
       const [cap, setCap] = useState('idle');
@@ -1286,7 +1313,21 @@ window.__ModuleLoader__.load({
         ),
         h('div', { key: 'bar1', style: S.bar },
           captureBtn,
-          h('button', { style: { ...S.btn, ...S.btnPrimary }, onClick: () => post('/open', { package: JD_PACKAGE, waitMs: 8000, human: true }, '打开京东') }, '🛍 打开京东'),
+          h('select', {
+            style: { ...S.select, maxWidth: '7em' },
+            value: launchPkg, 'data-launch-pkg': launchPkg,
+            title: '要打开的 App（候选可在「⚙ 设置 → 打开 App」里增删）',
+            onChange: async (e) => {
+              const pkg = e.target.value;
+              setLaunchPkg(pkg);
+              await post('/settings', { launchPkg: pkg }, '记住默认 App');
+            },
+          }, (apps.length ? apps : [{ label: '京东', pkg: JD_PACKAGE }]).map((a) => h('option', { key: a.pkg, value: a.pkg }, a.label || a.pkg))),
+          h('button', {
+            style: { ...S.btn, ...S.btnPrimary },
+            'data-open-app': '1',
+            onClick: () => post('/open', { package: launchPkg, waitMs: 8000, human: true }, '打开 App'),
+          }, '▶ 打开'),
           h('button', { style: S.btn, onClick: () => act({ action: 'key', key: 'BACK' }, '返回') }, '◀ 返回'),
           h('button', { style: S.btn, onClick: () => act({ action: 'home' }, '桌面') }, '⌂ 桌面'),
           h('button', { style: S.btn, 'data-recents': '1', onClick: () => act({ action: 'key', key: 'APP_SWITCH' }, '多任务') }, '🗂 多任务'),
@@ -1357,33 +1398,62 @@ window.__ModuleLoader__.load({
 
     /* ---------------------------------------------------------------- 设置页 */
 
-    // 用户 2026-10-18：①截图保存地址 ②截图目录自动清理 ③skill 位置（只读）。
+    // 用户 2026-10-18：①截图保存地址 ②截图目录自动清理 ③skill 位置（只读）④「▶ 打开」的候选 App。
     // 设置落盘在宿主 ~/.dsh/android-phone/settings.json；这里只是编辑界面。
+    // embedded=true 给 DSH 插件详情页用（不依赖 better-sidebar）：不显示「关闭」按钮、不做浮层外框。
     function SettingsSheet(props) {
-      const { post, onClose } = props;
+      const { post, onClose, embedded } = props;
       const [dir, setDir] = useState("");
       const [cleanup, setCleanup] = useState("7");
       const [choices, setChoices] = useState(["off", "1", "3", "7", "30"]);
       const [skills, setSkills] = useState(null);
       const [skillDir, setSkillDir] = useState("");
+      const [apps, setApps] = useState([]);
+      const [launchPkg, setLaunchPkg] = useState("");
+      const [defaultApps, setDefaultApps] = useState([]);
       const [msg, setMsg] = useState("");
+
+      const applySettings = useCallback((st, dirNow) => {
+        if (!st) return;
+        setDir(String(st.shotsDir || ""));
+        setCleanup(String(st.cleanup || "7"));
+        setApps(Array.isArray(st.apps) ? st.apps.map((a) => ({ label: String(a.label || ""), pkg: String(a.pkg || "") })) : []);
+        setLaunchPkg(String(st.launchPkg || ""));
+        if (dirNow) setMsg(`当前生效目录：${dirNow}`);
+      }, []);
 
       const load = useCallback(async () => {
         const r = await post("/settings", { action: "get" }, "读设置");
         if (r && r.ok) {
-          setDir(String((r.settings && r.settings.shotsDir) || ""));
-          setCleanup(String((r.settings && r.settings.cleanup) || "7"));
+          applySettings(r.settings, r.dir);
           if (Array.isArray(r.choices) && r.choices.length) setChoices(r.choices);
-          setMsg(r.dir ? `当前生效目录：${r.dir}` : "");
+          if (Array.isArray(r.defaultApps) && r.defaultApps.length) setDefaultApps(r.defaultApps);
+        } else if (r && r.error) {
+          setMsg(`读设置失败：${r.error}`);
         }
         const s = await post("/skills", {}, "读 skill");
         if (s && s.ok) { setSkills(Array.isArray(s.skills) ? s.skills : []); setSkillDir(String(s.dir || "")); }
-      }, [post]);
+      }, [post, applySettings]);
       useEffect(() => { load(); }, [load]);
 
       const save = async () => {
         const r = await post("/settings", { shotsDir: dir.trim(), cleanup }, "保存设置");
         if (r && r.ok) setMsg(`已保存。当前生效目录：${r.dir || "(默认)"}`);
+        else if (r && r.error) setMsg(`保存失败：${r.error}`);
+      };
+      // 「打开 App」候选单独一个保存按钮（用户 2026-10-18 要求）：改完不点保存不会生效。
+      const saveApps = async () => {
+        const clean = apps
+          .map((a) => ({ label: String(a.label || "").trim(), pkg: String(a.pkg || "").trim() }))
+          .filter((a) => a.label && a.pkg);
+        const r = await post("/settings", { apps: clean, launchPkg }, "保存 App 列表");
+        if (r && r.ok) {
+          applySettings(r.settings);
+          const n = r.settings && Array.isArray(r.settings.apps) ? r.settings.apps.length : clean.length;
+          setMsg(`App 列表已保存：${n} 个`);
+        } else if (r && r.error) {
+          setMsg(`保存 App 列表失败：${r.error}`);
+        }
       };
       const runCleanup = async () => {
         const r = await post("/settings", { action: "cleanup" }, "立即清理");
@@ -1393,13 +1463,19 @@ window.__ModuleLoader__.load({
         const r = await post("/settings", { action: "reveal" }, "打开目录");
         if (r && !r.ok) setMsg("打不开目录（可能还没生成过截图）");
       };
+      const setApp = (i, k, v) => setApps((prev) => prev.map((a, j) => (j === i ? { ...a, [k]: v } : a)));
+      const delApp = (i) => setApps((prev) => prev.filter((_, j) => j !== i));
+      const addApp = () => setApps((prev) => [...prev, { label: "", pkg: "" }]);
 
       const rowS = { display: "flex", gap: "0.4em", alignItems: "center", flexWrap: "wrap" };
       const bodyS = { fontSize: "0.92em", color: "var(--dshp-fg-soft, inherit)", lineHeight: 1.7 };
-      return h("div", { style: S.settingsWrap, "data-pane": "settings" },
+      const wrapS = embedded
+        ? { display: "flex", flexDirection: "column", gap: "0.7em", padding: "0.2em 0", maxWidth: "48em" }
+        : S.settingsWrap;
+      return h("div", { style: wrapS, "data-pane": "settings" },
         h("div", { style: rowS },
           h("span", { style: { ...S.hintTitle, flex: "1 1 auto" } }, "⚙ 设置"),
-          h("button", { style: S.btn, onClick: onClose }, "✕ 关闭"),
+          embedded ? null : h("button", { style: S.btn, onClick: onClose }, "✕ 关闭"),
         ),
         h("div", { style: S.settingsBlock },
           h("div", { style: S.hintTitle }, "① 截图保存地址"),
@@ -1438,21 +1514,106 @@ window.__ModuleLoader__.load({
                 s.description ? h("span", { style: bodyS }, s.description) : null,
               )))),
         ),
+        h("div", { style: S.settingsBlock },
+          h("div", { style: S.hintTitle }, "④ 打开 App（工具栏「▶ 打开」的候选）"),
+          h("div", { style: bodyS }, "包名填 Android 应用包名，例如 com.taobao.taobao。改完点「💾 保存 App 列表」才生效。"),
+          apps.length === 0
+            ? h("div", { style: bodyS }, "（空，点下面「＋ 新增」或「恢复默认列表」）")
+            : null,
+          ...apps.map((a, i) => h("div", { key: `${i}-${a.pkg}`, style: rowS, "data-app-row": String(i) },
+            h("input", {
+              style: { ...S.input, flex: "0 0 6em", width: "6em", minWidth: 0 }, value: a.label, spellCheck: false,
+              placeholder: "名称", "data-app-label": String(i),
+              onChange: (e) => setApp(i, "label", e.target.value),
+            }),
+            h("input", {
+              style: { ...S.input, flex: "1 1 12em", minWidth: 0 }, value: a.pkg, spellCheck: false,
+              placeholder: "com.example.app", "data-app-pkg": String(i),
+              onChange: (e) => setApp(i, "pkg", e.target.value),
+            }),
+            h("button", { style: S.btn, title: "删掉这一行", onClick: () => delApp(i) }, "✕"),
+          )),
+          h("div", { style: rowS },
+            h("button", { style: S.btn, onClick: addApp, "data-app-add": "1" }, "＋ 新增"),
+            h("button", { style: { ...S.btn, ...S.btnPrimary }, onClick: saveApps, "data-app-save": "1" }, "💾 保存 App 列表"),
+            h("button", {
+              style: S.btn,
+              onClick: () => setApps((defaultApps.length ? defaultApps : []).map((a) => ({ label: a.label, pkg: a.pkg }))),
+            }, "恢复默认列表"),
+          ),
+          h("div", { style: rowS },
+            h("span", { style: bodyS }, "工具栏默认选中："),
+            h("select", {
+              style: S.select, value: launchPkg, "data-app-launch": "1",
+              onChange: (e) => setLaunchPkg(e.target.value),
+            }, apps.filter((a) => a.pkg).map((a) => h("option", { key: a.pkg, value: a.pkg }, a.label || a.pkg))),
+          ),
+        ),
         msg ? h("div", { style: bodyS, "data-settings-msg": "1" }, msg) : null,
       );
+    }
+
+    // 插件详情页用的 post：不依赖 Panel 的 busy/notice 状态，失败时返回 { ok:false, error }。
+    function makePagePost(ctx) {
+      const base = apiBase(ctx);
+      return async (path, body) => {
+        try {
+          const r = await fetch(`${base}${path}`, {
+            method: "POST", cache: "no-store",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body || {}),
+          });
+          const j = await r.json().catch(() => ({}));
+          if (!r.ok) return { ok: false, error: j.error || `HTTP ${r.status}` };
+          return j;
+        } catch (e) {
+          return { ok: false, error: e.message };
+        }
+      };
+    }
+
+    // DSH「插件」页 → dsh-android-phone 详情页里的设置区。
+    // 用户 2026-10-18：没装 better-sidebar 的用户也要能改设置，所以走 slots 扩展点而不是侧栏 tab。
+    function PluginSettings(props) {
+      const post = useMemo(() => makePagePost(props.ctx), [props.ctx]);
+      return h(SettingsSheet, { post, embedded: true });
     }
     /* ---------------------------------------------------------------- 注册 */
 
     const name = 'dsh-android-phone';
-    const inject = ['betterSidebar'];
+    // 刻意不把 betterSidebar 声明成必需依赖：没装它的用户，插件页设置区照样要能用。
+    const inject = [];
 
     function apply(ctx) {
+      // ① DSH「插件」页 → 本插件详情页里的设置区（slots 扩展点，与 better-sidebar 无关）。
+      //    宿主把 plugins.bundle.config 的 key 与本包名对上时才会渲染（key 必须等于包名）。
       try {
-        if (!ctx.betterSidebar || typeof ctx.betterSidebar.registerTab !== 'function') {
-          console.warn('[android-phone] 没有 betterSidebar.registerTab，侧栏 tab 未注册');
+        const slots = ctx.slots;
+        if (slots && typeof slots.inject === 'function' && typeof slots.register === 'function') {
+          slots.inject('plugins.bundle.config', () => slots.register({
+            name: 'plugins.bundle.config',
+            key: 'dsh-android-phone',
+          }, (props) => {
+            const view = props && props.view;
+            if (view && view !== 'page') return null;   // summary 视图不塞表单
+            return h(PluginSettings, { ctx });
+          }));
+        } else {
+          console.warn('[android-phone] 没有 slots 扩展点，插件页设置区未注册');
+        }
+      } catch (e) {
+        console.warn('[android-phone] 插件页设置区注册失败', e);
+      }
+
+      // ② 侧栏 tab：只有装了 better-sidebar 才有。用 ctx.inject 等它就绪（激活顺序无关）。
+      const registerTab = (c) => {
+        const cc = c || ctx;
+        const sb = cc.betterSidebar;
+        if (!sb || typeof sb.registerTab !== 'function') {
+          console.warn('[android-phone] 没有 betterSidebar.registerTab，侧栏 tab 未注册（插件页设置区不受影响）');
           return;
         }
-        ctx.effect(() => ctx.betterSidebar.registerTab({
+        cc.effect(() => sb.registerTab({
           id: 'dsh-android-phone',
           title: '手机',
           description: '安卓真机：实时画面 + 操作注入 + 截图/长截图',
@@ -1461,8 +1622,12 @@ window.__ModuleLoader__.load({
           single: true,
           component: () => h(Panel, { ctx }),
         }), 'android-phone: sidebar tab');
+      };
+      try {
+        if (typeof ctx.inject === 'function') ctx.inject(['betterSidebar'], registerTab);
+        else registerTab(ctx);
       } catch (e) {
-        console.warn('[android-phone] 注册失败', e);
+        console.warn('[android-phone] 侧栏 tab 注册失败', e);
       }
     }
 

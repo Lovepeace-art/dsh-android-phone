@@ -25,7 +25,7 @@
 | DSH | desktop profile，`>= 0.2.0-rc.2` |
 | Node | ≥ 20（插件零 npm 依赖：adb 走命令行，PNG 编解码用自带 `src/core/png.js`） |
 | 安卓手机 | 「开发者选项 → USB 调试」打开，插 USB，弹窗点「一律允许」；建议 USB 模式选「传输文件」 |
-| 可选 | `dsh-better-sidebar ^0.25.0` —— 侧栏 tab 需要；不装则只有宿主能力，模型工具照常可用 |
+| 可选 | `dsh-better-sidebar ^0.25.0` —— 只有「侧栏 tab」需要它；没装则没有侧栏面板，但**设置项在 DSH「插件」页里照样能用**，模型工具也照常可用 |
 
 **adb 查找顺序**（`vendor/platform-tools/adb.exe` 已随包，一般不用管）：
 插件 config `adbPath` → `DSH_ADB` → `<插件>/vendor/platform-tools/` → `<cwd>/vendor/platform-tools/` → `%LOCALAPPDATA%\Android\Sdk\platform-tools\` → QtScrcpy 目录（版本号降序）→ Program Files → PATH
@@ -35,7 +35,7 @@
 ```powershell
 # 解压到任意目录，cd 进去，然后：
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\install.ps1
-# 重启 DSH → 侧栏出现「📱 手机」tab
+# 重启 DSH → 装了 better-sidebar 时侧栏出现「📱 手机」tab；设置项始终在「插件」页 → dsh-android-phone
 
 ... -WhatIfOnly   # 只预览要改什么
 ... -Copy         # 复制成自包含（不用 junction）
@@ -53,7 +53,9 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\install.ps1
 
 - **画面**：点 = 点击手机，按住 = 长按，拖动 = 真拖拽（DOWN + 连续 MOVE + UP），滚轮 = `INJECT_SCROLL_EVENT`（实测 1 格 = 192 设备像素 ≈ 0.08 屏），双指 = 缩放
 - **清晰度**：自适应（按面板 DPR 倒推 `maxSize`）/ 省流 / 标准 / 高清，改完重新拉流
-- **截图 / 长截图**：落盘 `<shotsDir>`（默认 `~/.dsh/android-phone/shots`），设置页可改路径与自动清理天数（关闭 / 1 / 3 / 7 / 30 天）
+- **截图 / 长截图**：落盘 `<shotsDir>`（默认 `~/.dsh/android-phone/shots`）
+- **⚙ 设置**：截图保存地址、自动清理天数（关闭 / 1 / 3 / 7 / 30 天）、Skill 位置（只读）、「▶ 打开」的候选 App。入口有两个：侧栏工具行的「⚙ 设置」，以及 **DSH「插件」页 → `dsh-android-phone` 详情页**（不装 better-sidebar 就在这里改）
+- **打开 App**：工具栏下拉选 App 再点「▶ 打开」。候选默认京东/淘宝/拼多多/抖音/微信/QQ，可在设置里增删；包名非法会被丢掉，全部非法则保留原列表
 - **状态行**：`画面 N fps` · `M Mbps` · `编码 W×H` · `前台 <包名>`
 
 ## 会话与控制权
@@ -141,7 +143,7 @@ npm test         # 离线回归 101 项：不需要手机、不需要 DSH、不�
 
 | 命令 | 覆盖 | 需要真机 |
 |---|---|---|
-| `npm test` | `test-stitch`（35 项，长截图拼接逐像素）+ `test-client`（66 项，侧栏逻辑/交互/键盘/剪贴板） | 否 |
+| `npm test` | `test-stitch`（35 项，长截图拼接逐像素）+ `test-client`（69 项，侧栏逻辑/交互/键盘/剪贴板/设置/打开 App） | 否 |
 | `npm run test:device` | `test-plugin-tools`（工具与协议编码）+ `test-session`（单会话长跑）+ `test-host`（HTTP 接口）+ `test-e2e-jd`（京东全链路） | **是** |
 
 - 报告写到 `test/reports/`（已 gitignore）。真机测试会占用手机，跑之前把手机放一边。

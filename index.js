@@ -132,30 +132,67 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 // ---------------- 设置（侧栏「⚙ 设置」页；落盘 ~/.dsh/android-phone/settings.json） ----------------
 // 只放「用户可改」的少量项。优先级：设置文件 > 插件 config > 环境变量 > 默认。
 const SETTINGS_CLEANUP_CHOICES = ['off', '1', '3', '7', '30'];   // off / 保留 N 天
-const SETTINGS_DEFAULT = { shotsDir: "", cleanup: "7" };
+// 工具栏「▶ 打开」下拉的候选。用户 2026-10-18：候选 App 由用户自己配置，默认给这 6 个。
+const SETTINGS_DEFAULT_APPS = [
+  { label: '京东', pkg: 'com.jingdong.app.mall' },
+  { label: '淘宝', pkg: 'com.taobao.taobao' },
+  { label: '拼多多', pkg: 'com.xunmeng.pinduoduo' },
+  { label: '抖音', pkg: 'com.ss.android.ugc.aweme' },
+  { label: '微信', pkg: 'com.tencent.mm' },
+  { label: 'QQ', pkg: 'com.tencent.mobileqq' },
+];
+const SETTINGS_DEFAULT = {
+  shotsDir: "", cleanup: "7",
+  apps: SETTINGS_DEFAULT_APPS, launchPkg: SETTINGS_DEFAULT_APPS[0].pkg,
+};
 let SETTINGS_CACHE = null;
 function settingsFile() { return join(homedir(), ".dsh", "android-phone", "settings.json"); }
+// 清洗 App 列表：包名不合法/重复的丢掉；全丢光时由 normalizeSettings 回落到默认列表。
+const APP_PKG_RE = /^[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z0-9_]+)+$/;
+function sanitizeApps(list) {
+  const out = [];
+  for (const it of Array.isArray(list) ? list : []) {
+    if (!it || typeof it !== "object") continue;
+    const pkg = String(it.pkg == null ? "" : it.pkg).trim();
+    if (!APP_PKG_RE.test(pkg)) continue;
+    if (out.some((x) => x.pkg === pkg)) continue;
+    const label = String(it.label == null ? "" : it.label).trim().slice(0, 16) || pkg.split(".").pop();
+    out.push({ label, pkg });
+  }
+  return out;
+}
+function normalizeSettings(s) {
+  const raw = s && typeof s === "object" ? s : {};
+  const out = { ...SETTINGS_DEFAULT, ...raw };
+  out.shotsDir = String(out.shotsDir == null ? "" : out.shotsDir).trim();
+  out.cleanup = SETTINGS_CLEANUP_CHOICES.includes(String(out.cleanup)) ? String(out.cleanup) : SETTINGS_DEFAULT.cleanup;
+  const apps = sanitizeApps(out.apps);
+  out.apps = apps.length ? apps : SETTINGS_DEFAULT_APPS.map((a) => ({ ...a }));
+  const want = String(out.launchPkg == null ? "" : out.launchPkg).trim();
+  out.launchPkg = out.apps.some((a) => a.pkg === want) ? want : out.apps[0].pkg;
+  return out;
+}
 function readSettings() {
   if (SETTINGS_CACHE) return SETTINGS_CACHE;
   let raw = {};
   try { raw = JSON.parse(readFileSync(settingsFile(), "utf8")) || {}; } catch { raw = {}; }
-  const s = { ...SETTINGS_DEFAULT, ...(raw && typeof raw === "object" ? raw : {}) };
-  if (typeof s.shotsDir !== "string") s.shotsDir = "";
-  if (!SETTINGS_CLEANUP_CHOICES.includes(String(s.cleanup))) s.cleanup = SETTINGS_DEFAULT.cleanup;
-  SETTINGS_CACHE = s;
-  return s;
+  SETTINGS_CACHE = normalizeSettings(raw);
+  return SETTINGS_CACHE;
 }
 function writeSettings(patch) {
   const cur = { ...readSettings() };
   const p = patch && typeof patch === "object" ? patch : {};
   if ("shotsDir" in p) cur.shotsDir = String(p.shotsDir == null ? "" : p.shotsDir).trim();
   if ("cleanup" in p) cur.cleanup = SETTINGS_CLEANUP_CHOICES.includes(String(p.cleanup)) ? String(p.cleanup) : cur.cleanup;
+  if ("apps" in p) { const apps = sanitizeApps(p.apps); if (apps.length) cur.apps = apps; }   // 全非法则保留原列表
+  if ("launchPkg" in p) cur.launchPkg = String(p.launchPkg == null ? "" : p.launchPkg).trim();
+  const norm = normalizeSettings(cur);
   try {
     mkdirSync(dirname(settingsFile()), { recursive: true });
-    writeFileSync(settingsFile(), JSON.stringify(cur, null, 2) + "\n", "utf8");
+    writeFileSync(settingsFile(), JSON.stringify(norm, null, 2) + "\n", "utf8");
   } catch { /* 落盘失败不影响本次生效 */ }
-  SETTINGS_CACHE = cur;
-  return cur;
+  SETTINGS_CACHE = norm;
+  return norm;
 }
 function shotsRoot(cfg) {
   const s = readSettings();
@@ -1269,13 +1306,13 @@ export function apply(ctx, config = {}) {
         if (route === 'settings') {
           if (args.action === 'get') {
             const s = readSettings();
-            json(res, 200, { ok: true, settings: s, dir: shotsRoot(cfg), choices: SETTINGS_CLEANUP_CHOICES });
+            json(res, 200, { ok: true, settings: s, dir: shotsRoot(cfg), choices: SETTINGS_CLEANUP_CHOICES, defaultApps: SETTINGS_DEFAULT_APPS });
             return;
           }
           if (args.action === 'cleanup') { json(res, 200, { ok: true, ...cleanupShots({ force: true }) }); return; }
           if (args.action === 'reveal') { json(res, 200, { ok: revealDir(shotsRoot(cfg)), dir: shotsRoot(cfg) }); return; }
           const saved = writeSettings(args);
-          json(res, 200, { ok: true, settings: saved, dir: shotsRoot(cfg) });
+          json(res, 200, { ok: true, settings: saved, dir: shotsRoot(cfg), defaultApps: SETTINGS_DEFAULT_APPS });
           return;
         }
         if (route === 'skills') { json(res, 200, { ok: true, ...listSkills() }); return; }

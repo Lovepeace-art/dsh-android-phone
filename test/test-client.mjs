@@ -64,8 +64,11 @@ const idMatch = checkSrc.match(/__ModuleLoader__\.load\(\{\s*id:\s*['"]([^'"]+)[
 check('模块 id 等于 package.json 的 name', idMatch?.[1] === pkg.name, `${idMatch?.[1]} vs ${pkg.name}`);
 const requires = [...checkSrc.matchAll(/require\(\s*['"]([^'"]+)['"]\s*\)/g)].map((m) => m[1]);
 check('只 require 了 baseline 包（react）', requires.length > 0 && requires.every((r) => r === 'react'), requires.join(', '));
-check('inject 声明了 betterSidebar', /const inject = \['betterSidebar'\]/.test(checkSrc));
-check('registerTab 包在 ctx.effect 里', /ctx\.effect\(\(\)\s*=>\s*ctx\.betterSidebar\.registerTab\(/.test(checkSrc));
+check('betterSidebar 不是必需依赖（没装也要能用插件页设置区）', /const inject = \[\]/.test(checkSrc));
+check('用 ctx.inject 等 betterSidebar 就绪', /ctx\.inject\(\['betterSidebar'\]/.test(checkSrc));
+check('registerTab 包在 ctx.effect 里', /cc\.effect\(\(\)\s*=>\s*sb\.registerTab\(/.test(checkSrc));
+check('注册了插件页设置区 plugins.bundle.config（key=包名）', /slots\.inject\('plugins\.bundle\.config'/.test(checkSrc) && /key:\s*'dsh-android-phone'/.test(checkSrc));
+check('设置页有「打开 App」区块（新增/保存/包名输入）', /data-app-add/.test(checkSrc) && /data-app-save/.test(checkSrc) && /data-app-pkg/.test(checkSrc));
 check('hostRouteUrl 不带前导斜杠', /hostRouteUrl\(\s*['"]dsh-android-phone\/api['"]\s*\)/.test(checkSrc)
   && !/hostRouteUrl\(\s*['"]\//.test(checkSrc));
 check('用了 WebCodecs 的 VideoDecoder 并带降级', /VideoDecoder/.test(checkSrc) && /startPoll/.test(checkSrc));
@@ -230,7 +233,7 @@ const html = container.innerHTML;
 check('hostRouteUrl 用的是 dsh-android-phone/api（不带前导斜杠）', mediaStore.hostRouteUrlArgs.includes('dsh-android-phone/api'), mediaStore.hostRouteUrlArgs.join(','));
 check('渲染出画布（实时画面）', !!container.querySelector('canvas'));
 check('渲染出设备信息（型号/Android）', /WLZ-AN00/.test(html) && /Android 12/.test(html), html.slice(0, 160).replace(/\s+/g, ' '));
-check('渲染出「打开京东 / 截图 / 长截图」按钮', /打开京东/.test(html) && /截图/.test(html) && /长截图/.test(html));
+check('渲染出「截图 / 长截图 / ▶ 打开」按钮', /截图/.test(html) && /长截图/.test(html) && /▶ 打开/.test(html) && !!container.querySelector('[data-open-app]'));
 check('请求打到宿主 base（/dsh-android-phone/api/status）', calls.some((c) => c.url.includes('/dsh-android-phone/api/status')), calls[0]?.url || '没有请求');
 check('没有 WebCodecs 时降级成快照模式（界面提示）', /快照|WebCodecs|退回/.test(html), (html.match(/[^>]{0,60}(快照|WebCodecs)[^<]{0,40}/) || [])[0] || '');
 check('降级后仍在轮询 /snapshot', calls.filter((c) => c.url.includes('/snapshot')).length >= 1 || true, 'jsdom 里 createImageBitmap 是桩，轮询可能尚未触发');
@@ -243,9 +246,9 @@ const click = async (label) => {
   return btn;
 };
 
-await click('打开京东');
+await click('▶ 打开');
 const openCall = calls.filter((c) => c.url.endsWith('/open')).pop();
-check('点「打开京东」POST /open 且带京东包名', openCall?.body?.package === 'com.jingdong.app.mall', JSON.stringify(openCall?.body));
+check('点「▶ 打开」POST /open 且带默认 App 包名（京东）', openCall?.body?.package === 'com.jingdong.app.mall', JSON.stringify(openCall?.body));
 
 // 截图机（用户拍板 m02983 + UI-PLAN §3）：单击截图 → 绿色待命 5s → 按 L 长截图 → 再点停止
 await click('截图');
@@ -514,12 +517,12 @@ check('顶栏一行内同时有：连接/控制权/分辨率 + 画面 + 暂停 +
     && !!devRow.querySelector('[data-res]') && !!devRow.querySelector('select[data-view]')
     && !!devRow.querySelector('button[data-pause]') && !!devRow.querySelector('select[data-quality]'),
   devRow ? devRow.textContent.slice(0, 90) : '没有顶栏');
-check('第二行：截图按钮排在「打开京东」前面',
+check('第二行：截图按钮排在「▶ 打开」前面，且「▶ 打开」是 App 下拉 + 按钮',
   !!bar1Row && (() => {
     const txt = bar1Row.textContent || '';
     const iShot = txt.indexOf('截图');
-    const iJd = txt.indexOf('打开京东');
-    return iShot >= 0 && iJd > iShot;
+    const iOpen = txt.indexOf('▶ 打开');
+    return iShot >= 0 && iOpen > iShot && !!bar1Row.querySelector('select[data-launch-pkg]');
   })(), bar1Row ? bar1Row.textContent.slice(0, 90) : '没有第二行');
 
 const pauseBtn = container.querySelector('button[data-pause]');
