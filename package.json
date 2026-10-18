@@ -18,7 +18,6 @@
     "scripts/install.ps1",
     "skills",
     "vendor",
-    "assets",
     "cordis.patch.yml",
     "README.md",
     "LICENSE",
@@ -62,7 +61,8 @@
     "test": "node test/test-stitch.mjs && node test/test-client.mjs",
     "test:offline": "node test/test-stitch.mjs && node test/test-client.mjs",
     "test:device": "node test/test-plugin-tools.mjs && node test/test-session.mjs && node test/test-host.mjs && node test/test-e2e-jd.mjs",
-    "install:profile": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/install.ps1"
+    "install:profile": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/install.ps1",
+    "uninstall:profile": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/install.ps1 -Uninstall"
   },
   "devDependencies": {
     "jsdom": "^30.1.3",
