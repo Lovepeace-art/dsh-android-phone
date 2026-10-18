@@ -33,9 +33,6 @@ Use DSH's built-in installer; no script to run:
 3. Install (DSH's bundled pnpm handles dependencies and registration)
 4. **Restart DSH**
 
-Or via the CLI (equivalent, handy when an agent does the work):
-`dsh plugin --profile desktop add "link:<absolute path to the plugin>"` — it sets up the dependency, the `node_modules` link and the `dsh.profile.bundles` registration in one go. If `dsh` is not on PATH, it is usually at `<DSH install dir>\resources\runtime\cli\bin\dsh.cmd`.
-
 After installing, the plugin shows up on DSH's "Plugins" page (enable/disable and configure it there); with better-sidebar installed, a "Phone" tab appears in the sidebar too.
 
 > **Not published to npm yet**, so installing "by package name" does not work — use a local path or the Git URL.
@@ -43,16 +40,11 @@ After installing, the plugin shows up on DSH's "Plugins" page (enable/disable an
 
 ### Let an agent install it
 
-Paste this to the model (it needs to be able to run commands on this machine):
+Give the model the absolute path of the plugin directory, plus:
 
-> Install the DSH plugin `dsh-android-phone` on this Windows machine. The plugin directory is `<absolute path to your clone>`.
-> Do not click through the UI — install it with the CLI (equivalent to DSH "Settings → Plugins → Add plugin → local path"):
-> 1. Find DSH's bundled CLI `dsh`; if it is not on PATH it is usually `<DSH install dir>\resources\runtime\cli\bin\dsh.cmd`.
-> 2. Run `dsh plugin --profile desktop add "link:<absolute path to the plugin>"` (use the profile I am actually using; it may not be named `desktop`).
-> 3. Restart DSH.
-> When done, run `node scripts/doctor.mjs` in the plugin directory (zero dependencies, no `npm install` needed); it must be 10/10 green.
-> If anything shows ❌, fix it per the hint (stale adb, phone not connected, profile not registered in `dsh.profile.bundles`).
-> Finally tell me: which profile it went into, the doctor result, and whether "restart DSH" or "reload the sidebar" is needed. Do not modify the repository's code files.
+> Install the DSH plugin `dsh-android-phone` (directory `<absolute path>`): run `dsh plugin --profile <my profile> add "link:<absolute path>"`
+> (if `dsh` is not on PATH, use `<DSH install dir>\resources\runtime\cli\bin\dsh.cmd`), then run `node scripts/doctor.mjs` and make it 10/10 green, then restart DSH.
+> Do not modify files in the repository.
 
 ## How it works
 
@@ -96,10 +88,6 @@ Coding conventions (hard rules, common pitfalls, what to check after a change) l
 
 ## Disclaimer
 
-- This is a personal open-source project. It is **not affiliated with or endorsed by** JD, Taobao, Pinduoduo, Douyin, WeChat, QQ, Google (Android SDK platform-tools) or Genymobile (scrcpy).
-- Use it only on devices **you own or are authorized to use**. Automating some apps may violate their terms of service and put your account at risk — **you bear the consequences**.
-- App names, icons and trademarks belong to their respective owners; they are used here only for identification and display, with no claim of any rights.
-- The software is provided "AS IS", without warranty of any kind (see [Apache-2.0](LICENSE), section 7).
 - If you believe something in this repository infringes your rights, please open an Issue; it will be **removed or replaced promptly** once verified.
 
 ## Contributing

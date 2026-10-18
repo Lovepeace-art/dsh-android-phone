@@ -8,7 +8,7 @@
  * 需要验证完整链路（起流 / 注入 / 长截图）请跑 `npm run test:device`。
  */
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -98,38 +98,64 @@ try {
   add(false, '截图目录不可写', `${shots}：${e.message}`);
 }
 
-// ── 6. 装进 DSH profile 了吗 ────────────────────────────────
+// ── 6. 装进 DSH profile 了吗（扫所有 profile，不假定它叫 desktop）──
+// DSH 允许有多个 profile（desktop / web / 用户自建），插件装在哪一个都可能。
+// 这里全扫一遍，然后优先把结果报在「真的装了本插件」的那个 profile 上。
 const profilesDir = join(homedir(), '.dsh', 'profiles');
 let installed = null;
+const scanned = [];
 if (existsSync(profilesDir)) {
-  for (const prof of ['desktop']) {
+  let names = [];
+  try {
+    names = readdirSync(profilesDir).filter((n) => existsSync(join(profilesDir, n)));
+  } catch { names = []; }
+  // desktop 排最前（最常见），其余按名字排序，保证多次运行输出稳定
+  names.sort((a, b) => (a === 'desktop' ? -1 : b === 'desktop' ? 1 : a.localeCompare(b)));
+
+  const candidates = [];
+  for (const prof of names) {
     const dir = join(profilesDir, prof);
-    if (!existsSync(dir)) continue;
     const link = join(dir, 'node_modules', NAME);
     let linked = false;
     try {
       linked = existsSync(link) && realpathSync(link).toLowerCase() === realpathSync(ROOT).toLowerCase();
     } catch { linked = false; }
     let bundled = false;
-    let skillRoot = false;
     try {
       const pj = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8'));
       bundled = (pj?.dsh?.profile?.bundles || []).includes(NAME);
     } catch { /* 读不到就按未注册处理 */ }
+    let skillRoot = false;
     try {
       const yml = readFileSync(join(dir, 'cordis.patch.yml'), 'utf8');
       skillRoot = yml.includes(join(ROOT, 'skills'));
     } catch { /* 同上 */ }
-    installed = { prof, dir, linked, bundled, skillRoot };
-    break;
+    scanned.push(prof);
+    candidates.push({ prof, dir, linked, bundled, skillRoot });
   }
-}
-if (installed) {
-  add(installed.linked, `profile 里指向本仓库（${installed.prof}）`, installed.linked ? installed.dir : '链接不存在或指向别处：用 DSH 插件页重新安装（设置 → 插件 → 添加插件）');
-  add(installed.bundled, '已注册进 dsh.profile.bundles', installed.bundled ? '' : '用 DSH 插件页重新安装一次');
 
+  // 优先级：链接+注册 > 只注册 > 只链接 > 都没有（只为把 ❌ 报在用户真正在用的 profile 上）
+  installed =
+    candidates.find((c) => c.linked && c.bundled) ||
+    candidates.find((c) => c.bundled) ||
+    candidates.find((c) => c.linked) ||
+    candidates[0] ||
+    null;
+}
+if (installed && (installed.linked || installed.bundled)) {
+  add(
+    installed.linked,
+    `profile 里指向本仓库（${installed.prof}）`,
+    installed.linked ? installed.dir : '链接不存在或指向别处：用 DSH 插件页重新安装（设置 → 插件 → 添加插件）'
+  );
+  add(installed.bundled, '已注册进 dsh.profile.bundles', installed.bundled ? '' : '用 DSH 插件页重新安装一次');
 } else {
-  add(false, '没找到 DSH desktop profile', `${profilesDir} 不存在：DSH 装了吗？装好后用 DSH 插件页安装本插件`);
+  add(
+    false,
+    '没在任何 DSH profile 里找到本插件',
+    `${profilesDir} 下${scanned.length ? '有 profile（' + scanned.join('、') + '）但都没装本插件' : '没有 profile'}：用 DSH 插件页安装（设置 → 插件 → 添加插件）`
+  );
+  add(false, '已注册进 dsh.profile.bundles', '用 DSH 插件页安装后会自动注册');
 }
 
 

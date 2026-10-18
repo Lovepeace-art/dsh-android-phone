@@ -33,10 +33,6 @@
 3. 安装（DSH 用自带 pnpm 完成依赖与注册）
 4. **重启 DSH**
 
-也可以走 CLI（与上面等价，agent 代劳时用这条）：
-`dsh plugin --profile desktop add "link:<插件绝对路径>"` —— 它会把依赖、`node_modules` 链接和
-`dsh.profile.bundles` 注册一次做完；`dsh` 不在 PATH 时一般在 `<DSH 安装目录>\resources\runtime\cli\bin\dsh.cmd`。
-
 装完插件会出现在 DSH 的「插件」页（可在这里开关与配置）；装了 better-sidebar 时侧栏还会多出「手机」tab。
 
 > 目前**没有发布到 npm**，所以「填包名」那条路暂时走不通 —— 用本地路径或 Git 地址。
@@ -44,16 +40,11 @@
 
 ### 让 agent 帮你装
 
-把下面这段发给模型即可（需要它能在本机执行命令）：
+把插件目录的绝对路径给模型，附一句：
 
-> 在这台 Windows 机器上安装 DSH 插件 `dsh-android-phone`，插件目录是 `<填你克隆出来的绝对路径>`。
-> 不要点界面，用 CLI 装（与 DSH「设置 → 插件 → 添加插件 → 本地路径」等价）：
-> 1. 找 DSH 自带 CLI `dsh`；不在 PATH 时一般在 `<DSH 安装目录>\resources\runtime\cli\bin\dsh.cmd`。
-> 2. 跑 `dsh plugin --profile desktop add "link:<插件绝对路径>"`（profile 用我正在用的那个，未必叫 desktop）。
-> 3. 重启 DSH。
-> 装完在插件目录跑 `node scripts/doctor.mjs`（零依赖，不需要 npm install），必须 10/10 全绿；有 ❌ 按提示修
-> （adb 过期、手机没连、profile 没注册进 `dsh.profile.bundles`）。
-> 最后告诉我：装到哪个 profile、doctor 结果、需要「重启 DSH」还是「刷新侧栏」。不要修改仓库里的代码文件。
+> 装上 DSH 插件 `dsh-android-phone`（目录 `<绝对路径>`）：跑 `dsh plugin --profile <我的 profile> add "link:<绝对路径>"`
+> （`dsh` 不在 PATH 时用 `<DSH 安装目录>\resources\runtime\cli\bin\dsh.cmd`），装完跑 `node scripts/doctor.mjs` 要 10/10 全绿，再重启 DSH。
+> 不要改仓库里的代码。
 
 ## 工作原理
 
@@ -95,11 +86,6 @@
 
 ## 免责声明
 
-- 本项目是个人开源项目，与京东、淘宝、拼多多、抖音、微信、QQ 等 App 的运营方，以及 Google（Android SDK platform-tools）、
-  Genymobile（scrcpy）**均无任何关联**，也未获其背书。
-- 请只在你**拥有或已获授权**的设备上使用。自动化操作某些 App 可能违反其用户协议并带来账号风险，**后果由使用者自负**。
-- 仓库内出现的 App 名称、图标与商标归各自所有者，本项目仅用于识别与展示，不主张任何权利。
-- 软件按「现状」提供，不附带任何明示或暗示担保（见 [Apache-2.0](LICENSE) 第 7 条）。
 - 若你认为本仓库某处内容侵犯了你的权利，请在本仓库开 Issue 说明，核实后我会**立即删除或替换**相应内容。
 
 ## 参与贡献
