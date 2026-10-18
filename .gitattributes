@@ -5,6 +5,9 @@
 # Windows PowerShell 5.1 在无 BOM 时会按 ANSI(CP936) 解码，中文注释会变乱码并报假的语法错误。
 *.ps1 -text
 
+# git 钩子必须 LF：CRLF 会让 Git Bash 报 $'\r': command not found
+.githooks/** text eol=lf
+
 # 源码与文本统一 LF
 *.js text eol=lf
 *.mjs text eol=lf

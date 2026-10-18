@@ -1,0 +1,12 @@
+#!/bin/sh
+# 推送前：静态校验 + 离线回归（离线套件不需要手机，但需要 npm install）
+set -e
+cd "$(git rev-parse --show-toplevel)"
+node scripts/check.mjs
+if [ -d node_modules ]; then
+  node test/test-stitch.mjs > /dev/null
+  node test/test-client.mjs > /dev/null
+  echo "[pre-push] 离线回归通过（拼接 + 侧栏 UI）"
+else
+  echo "[pre-push] 跳过离线回归：未安装 node_modules，先跑 npm install"
+fi

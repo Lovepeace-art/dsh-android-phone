@@ -23,7 +23,7 @@
 |---|---|
 | Windows 10/11 | `install.ps1` 与随包 `adb.exe` |
 | DSH | desktop profile，`>= 0.2.0-rc.2` |
-| Node | ≥ 20（插件零 npm 依赖：adb 走命令行，PNG 编解码用自带 `src/core/png.js`） |
+| Node | ≥ 20（插件运行时零 npm 依赖：adb 走命令行，PNG 编解码用自带 `src/core/png.js`） |
 | 安卓手机 | 「开发者选项 → USB 调试」打开，插 USB，弹窗点「一律允许」；建议 USB 模式选「传输文件」 |
 | 可选 | `dsh-better-sidebar ^0.25.0` —— 只有「侧栏 tab」需要它；没装则没有侧栏面板，但**设置项在 DSH「插件」页里照样能用**，模型工具也照常可用 |
 
@@ -46,8 +46,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\install.ps1
 
 - 官方 `dsh plugin add` 会拒绝 desktop profile（"managed exclusively by the Electron application"），所以安装由脚本自己做。
 - ⚠️ `install.ps1` 必须保持 **UTF-8 BOM**：Windows PowerShell 5.1 读无 BOM 的 `.ps1` 会按 ANSI 解码，中文变乱码并报一堆假的 `Missing closing '}'`。
-- **生效规则**：`index.js` / `src/**` 改完**重启 DSH**；`client.js` 只要 **Ctrl+Shift+R** 硬刷新。
 - 装好后 profile 里是**链接**（junction），直接改仓库文件就生效，不用重装。
+- 装完想确认环境是否齐备：`npm run doctor`。
 
 ## 侧栏
 
@@ -69,7 +69,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\install.ps1
 | 工具 | 用途 |
 |---|---|
 | `phone_status` | adb 路径/版本、在线设备、机型与 Android 版本、分辨率、前台 App、会话状态、控制权 |
-| `phone_apps` | 列包名（默认第三方 App，可按关键字过滤） |
+| `phone_apps` | 列包名（默认第三方 App，可按关键字过滤，可只列桌面上有图标的） |
 | `phone_open` | 把 App 切到前台（默认京东）；模型调用时**自动起会话** |
 | `phone_screenshot` | 单帧截图 |
 | `phone_longshot` | 长截图（自动滚动拼接，可切块） |
@@ -134,21 +134,50 @@ node skills/jd-shop-longshot/scripts/jd-shop-longshot.mjs --keyword 牛奶 --sho
 4. **坐标用视频尺寸，不是设备像素**：服务端 `PositionMapper.map()` 要求 `Position.screenSize` 严格等于编码尺寸，不等就直接丢弃，只在 VERBOSE 日志里说一句。
 5. **指针 DOWN/UP 每根手指都要发**：`POINTER_DOWN/UP` 由服务端改写并补 `pointerIndex`，客户端发 5/6 会让 Android 判定「index 0 又按了一次」而整条丢弃。
 
-## 测试
+## 项目结构
 
-```bash
-npm install      # 只装离线测试依赖（react / react-dom / jsdom）；插件运行时零 npm 依赖
-npm test         # 离线回归 101 项：不需要手机、不需要 DSH、不需要浏览器
-```
+| 路径 | 说明 |
+|---|---|
+| `index.js` | **宿主插件入口**：12 个 `phone_*` 工具、18 个 HTTP 路由、设置读写、截图目录清理、skill 索引 |
+| `client.js` | **侧栏面板**（浏览器侧单文件；受 DSH `__ModuleLoader__` 约束，禁 JSX/TS/`import`） |
+| `src/android/` | 与手机打交道：`adb.js` adb 封装、`video.js` 取流与帧解析、`control.js` 控制消息编码、`session.js` 单会话与自愈、`actions.js` 动作执行、`longshot.js` 长截图、`overlay.js` 固定栏蒙版 |
+| `src/core/` | 与手机无关的纯逻辑：`stitch.js` 拼接算法、`png.js` PNG 编解码、`quality.js` 画质档、`attach.js` 附件落盘、`preview.js` 预览缩图 |
+| `actions/` | 预置动作序列（`phone_preset` 读取） |
+| `skills/` | 附带 skill（可选，安装时同步到 profile） |
+| `test/` | `test-stitch` / `test-client` 离线；`test-plugin-tools` / `test-session` / `test-host` / `test-e2e-jd` 需真机 |
+| `scripts/` | `install.ps1` 装进 profile、`doctor.mjs` 环境自检、`check.mjs` 静态校验（CI 与 git 钩子用） |
+| `vendor/` | 随包的 `adb.exe`（platform-tools 37.0.1）与 `scrcpy-server`（v5.0.1） |
+| `cordis.patch.yml` | 插件默认配置（adb 路径、起流参数等） |
 
-| 命令 | 覆盖 | 需要真机 |
-|---|---|---|
-| `npm test` | `test-stitch`（35 项，长截图拼接逐像素）+ `test-client`（84 项，侧栏逻辑/交互/键盘/剪贴板/设置/打开 App） | 否 |
-| `npm run test:device` | `test-plugin-tools`（工具与协议编码）+ `test-session`（单会话长跑）+ `test-host`（HTTP 接口）+ `test-e2e-jd`（京东全链路） | **是** |
+## 开发
 
-- 报告写到 `test/reports/`（已 gitignore）。真机测试会占用手机，跑之前把手机放一边。
+改哪里、怎么生效：
+
+| 改动 | 生效方式 |
+|---|---|
+| `client.js` | **Ctrl+Shift+R** 硬刷新侧栏 |
+| `index.js` / `src/**` / `cordis.patch.yml` | **重启 DSH** |
+| `skills/**` / `actions/**` | `npm run install:profile` 后重启 DSH |
+| `README` / `test/**` / `AGENTS.md` | 不用管 |
+| `scripts/install.ps1` | 重跑安装脚本（并保持 UTF-8 BOM + LF） |
+
+常用命令：
+
+| 命令 | 作用 |
+|---|---|
+| `npm install` | 只装离线测试依赖（react / react-dom / jsdom）；插件运行时零 npm 依赖 |
+| `npm test` | 离线回归：拼接 35 项 + 侧栏 UI 86 项，不需要手机、DSH、浏览器 |
+| `npm run test:device` | 真机回归：工具与协议编码 + 单会话长跑 + HTTP 接口 + 京东全链路（**会占用手机**） |
+| `npm run ci` | 提 PR 前跑这个：`node --check` 全量 + `install.ps1` 编码校验 + 离线回归 |
+| `npm run doctor` | 本机环境自检（Node、adb、设备、profile 里的 junction 等） |
+| `npm run hooks` | 启用 `.githooks`（一次性，仅本机生效） |
+| `npm run install:profile` | 重新装进 DSH profile（换机器 / 挪仓库 / 改名后需要） |
+
+- 报告写到 `test/reports/`（已 gitignore）。
 - 跑测试需要 **Node ≥ 22.15**（`jsdom` 依赖的 `undici` 用到 `zlib.createZstdDecompress`）；插件运行时仍只需 Node ≥ 20。
-- CI（`.github/workflows/test.yml`）：push / PR 时在 **windows × node 22/24** 跑 `npm test`。只跑 Windows 是因为 `package.json` 声明了 `os: ["win32"]`，linux runner 上 `npm install` 会直接 `EBADPLATFORM` 退出。
+- CI（`.github/workflows/test.yml`）：push / PR 时在 **windows × node 22/24** 跑 `npm run ci`。只跑 Windows 是因为 `package.json` 声明了 `os: ["win32"]`，linux runner 上 `npm install` 会直接 `EBADPLATFORM` 退出。
+
+开发约定（硬约定、常见陷阱、改完要检查什么）集中在 **[AGENTS.md](AGENTS.md)**；协作流程见 **[CONTRIBUTING.md](CONTRIBUTING.md)**。
 
 ## 已知限制
 
@@ -166,6 +195,13 @@ npm test         # 离线回归 101 项：不需要手机、不需要 DSH、不�
 | 画面不动 | 静止页面本来只有 5~6fps；若 fps 为 0 且手机前台在变，硬刷新侧栏（流结束会自动重连） |
 | 点了没反应 | 多半是控制权在人手上（顶栏「✋ 人在操作」），点「↩ 交还模型」 |
 | 长截图重复或接缝 | 吸顶 / 懒加载 / 倒计时动画会少量错位，先滚到顶再触发 |
+| 安装脚本报假的语法错误 | `install.ps1` 的 BOM 丢了，`git checkout -- scripts/install.ps1` 还原 |
+
+## 参与贡献
+
+欢迎 Issue 与 PR。提 PR 前请跑一遍 `npm run ci`，并按 PR 模板填写测试情况（UI 改动附截图、协议层改动注明依据）。详细流程与代码约定见 [CONTRIBUTING.md](CONTRIBUTING.md)。
+
+本项目未使用 CLA：按 Apache-2.0 提交 PR 即视为同意以同一许可证授权你的贡献。
 
 ## 许可与致谢
 

@@ -1,0 +1,52 @@
+name: 功能建议
+description: 希望插件支持的新能力或改进
+title: "[Feature] "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: need
+    attributes:
+      label: 你希望做到什么
+      description: 一句话说清目标，再补充细节
+    validations:
+      required: true
+
+  - type: textarea
+    id: scene
+    attributes:
+      label: 使用场景
+      description: 你打算用它做什么？AI 自动操作、人工筛页面、还是别的？
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: 涉及部分
+      options:
+        - 画面 / 延迟 / 画质
+        - 控制注入（点按 / 拖拽 / 滚轮 / 键盘）
+        - 截图 / 长截图
+        - 安装 / 配置 / 设置页
+        - 侧栏 UI
+        - 模型工具（phone_*）
+        - skill 与业务流程
+        - 其它
+    validations:
+      required: true
+
+  - type: textarea
+    id: ref
+    attributes:
+      label: 参考实现（可选）
+      description: 有别的工具/项目已经做过，给个链接或截图
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: ack
+    attributes:
+      label: 确认
+      options:
+        - label: 我知道画面与输入注入的能力上限受 scrcpy-server 协议限制（不是想加什么就能加）
+          required: true

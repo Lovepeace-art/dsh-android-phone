@@ -1,0 +1,83 @@
+name: Bug 反馈
+description: 画面、控制、截图、安装出问题时用这个模板
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        请先跑 `npm run doctor`，把输出贴到下面的「环境自检」里 —— 大部分问题一眼就能看出来。
+        提问前也看一眼 README 的「常见问题」与「已知限制」。
+
+  - type: textarea
+    id: what
+    attributes:
+      label: 现象
+      description: 你看到什么、期望是什么。有截图更好（手机型号/面板截图都可以）。
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤
+      placeholder: |
+        1. 重启 DSH
+        2. 打开侧栏「📱 手机」
+        3. 点画面 / 滚轮 / 截图 …
+    validations:
+      required: true
+
+  - type: input
+    id: device
+    attributes:
+      label: 手机型号 + Android 版本
+      placeholder: HUAWEI WLZ-AN00 / Android 12 / 1080x2400
+    validations:
+      required: true
+
+  - type: dropdown
+    id: conn
+    attributes:
+      label: 连接方式
+      options:
+        - USB 数据线
+        - 无线调试（adb connect）
+        - 不确定
+    validations:
+      required: true
+
+  - type: textarea
+    id: doctor
+    attributes:
+      label: npm run doctor 输出
+      description: 在仓库根目录执行，整段粘贴
+      render: shell
+    validations:
+      required: true
+
+  - type: input
+    id: env
+    attributes:
+      label: 环境
+      placeholder: Windows 11 24H2 / DSH 0.2.0-rc.x / Node 22.x / 侧栏宽度 486px
+    validations:
+      required: true
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: 其它信息
+      description: 面板底栏状态行（画面 N fps / M Mbps / 编码 W×H / 前台 包名）、宿主日志、`adb devices -l` 输出等
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: ack
+    attributes:
+      label: 确认
+      options:
+        - label: 我看过 README 的「常见问题」与「已知限制」，不是已记录的情况
+          required: true
+        - label: 手机已解锁，USB 调试已授权
+          required: false

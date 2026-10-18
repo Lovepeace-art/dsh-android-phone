@@ -59,6 +59,9 @@
     "dsh": ">=0.2.0-rc.2"
   },
   "scripts": {
+    "check": "node scripts/check.mjs",
+    "ci": "node scripts/check.mjs && node test/test-stitch.mjs && node test/test-client.mjs",
+    "hooks": "git config core.hooksPath .githooks && node -e \"console.log('已启用 .githooks（只影响本机 clone）')\"",
     "test": "node test/test-stitch.mjs && node test/test-client.mjs",
     "test:offline": "node test/test-stitch.mjs && node test/test-client.mjs",
     "test:device": "node test/test-plugin-tools.mjs && node test/test-session.mjs && node test/test-host.mjs && node test/test-e2e-jd.mjs",

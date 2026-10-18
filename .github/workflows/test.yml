@@ -33,8 +33,10 @@ jobs:
       - name: 安装测试依赖
         run: npm install --no-audit --no-fund
 
-      - name: 离线回归（不需要真机）
-        run: npm test
+      # npm run ci = 静态校验（node --check 全量 + install.ps1 BOM/LF + gitattributes
+      # + git 索引无调试产物）+ 离线回归。与本地 `npm run ci` 完全一致。
+      - name: 静态校验 + 离线回归（不需要真机）
+        run: npm run ci
 
       - name: 上传测试报告
         if: always()

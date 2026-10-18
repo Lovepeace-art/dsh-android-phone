@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 使用问题与讨论
+    url: https://github.com/Lovepeace-art/dsh-android-phone/issues
+    about: 提问前先看 README 的「常见问题」与「已知限制」，再搜一下有没有同类 Issue
