@@ -7,8 +7,10 @@
  * 规矩（client 半边）：
  *  - 手写纯 JS，不能用 JSX/TS/import/export；只 require baseline 里有的包（这里只用 react）。
  *  - 必须用 window.__ModuleLoader__.load({ id: '<包名>', factory }) 注册，id 要与包名一致。
- *  - 拿宿主路由 URL 必须走 ctx.betterSidebar.hostRouteUrl('dsh-android-phone/api')，不能带前导斜杠。
- *  - registerTab 必须包在 ctx.effect 里，否则 HMR 二次激活会抛 "already registered"。
+ *  - 侧栏显示走 DSH **原生**右侧栏（sidebarRightTabs 页签注册表 + sidebar.right.pane.tab 插槽），
+ *    不依赖任何第三方侧栏插件，见 registerSidebar()。
+ *  - 拿宿主路由 URL 走「相对页面 base 解析」（不能带前导斜杠），见 apiBase()。
+ *  - 任何注册都必须能被撤销（包在 ctx.effect 里），否则 HMR 二次激活会抛 "already registered"。
  */
 window.__ModuleLoader__.load({
   id: 'dsh-android-phone',
@@ -189,6 +191,12 @@ window.__ModuleLoader__.load({
 `;
 
     const S = {
+      // 原生右侧栏「页面本体」插槽给我们的盒子不一定是有确定高度的 flex 列（不同宿主版本不一样），
+      // 所以先自备一层列 flex 宿主，Panel 根节点上的 flex:1 / height:100% 才有意义。
+      nativeHost: {
+        display: 'flex', flexDirection: 'column', flex: '1 1 auto', height: '100%', minHeight: 0,
+        width: '100%', boxSizing: 'border-box',
+      },
       root: {
         display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, width: '100%',
         boxSizing: 'border-box', overflow: 'hidden', minWidth: 0,
@@ -237,10 +245,18 @@ window.__ModuleLoader__.load({
 
     /* ---------------------------------------------------------------- 小工具 */
 
+    /**
+     * 插件自己的宿主路由前缀（所有请求都从它拼出来）。
+     *
+     * 只走「相对页面 base 解析」：带前导斜杠的 '/dsh-android-phone/api' 会被钉死在源站根目录，
+     * 反向代理到子目录（https://host/xxx/proxy/3080/）时直接 404；相对 base 解析既保住
+     * 子目录前缀，也保住 Electron 壳（页面是 dsh-app://app/，壳把非静态路径原样转发给宿主）。
+     */
     function apiBase(ctx) {
+      const rel = 'dsh-android-phone/api/';
       try {
-        const u = ctx.betterSidebar.hostRouteUrl('dsh-android-phone/api');
-        if (typeof u === 'string' && u) return u.replace(/\/+$/, '');
+        const base = (typeof document !== 'undefined' && document.baseURI) || (typeof location !== 'undefined' && location.href);
+        if (base) return new URL(rel, base).href.replace(/\/+$/, '');
       } catch { /* 回退 */ }
       return '/dsh-android-phone/api';
     }
@@ -834,7 +850,7 @@ window.__ModuleLoader__.load({
     let APPS_CACHE = null;
     async function fetchSettings(ctx) {
       try {
-        const r = await fetch(`\${apiBase(ctx)}/settings`, {
+        const r = await fetch(`${apiBase(ctx)}/settings`, {
           method: 'POST', cache: 'no-store',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ action: 'get' }),
@@ -846,6 +862,13 @@ window.__ModuleLoader__.load({
     }
     function Panel(props) {
       const { ctx } = props;
+      // 是否正在被看见：原生侧栏用 keepMounted 保留面板（切页签不丢状态），
+      // 但没被选中时不该继续吃手机电量/带宽 —— 视频流跟着 visible 停，切回来自动重连。
+      // 插件页设置区不传 visible，缺省即「一直在看」；原生侧栏页签由插槽透传 visible。
+      const visible = props.visible !== false;
+      // 原生右侧栏里由面板根节点自己当「占满宿主的列 flex 宿主」：宿主 pane body 是块级滚动容器，
+      // 不是 flex 列。刻意不再套一层 div —— 少一层 DOM，键盘直通与焦点也仍然挂在根节点上。
+      const nativeHost = props.nativeHost === true;
       const api = useMemo(() => ({ base: apiBase(ctx) }), [ctx]);
       const [status, setStatus] = useState(null);
       // /status 的 ref 镜像：剪贴板轮询要读最新值，用 state 会多一层闭包过期问题
@@ -1265,7 +1288,7 @@ window.__ModuleLoader__.load({
 
       const video = h(Screen, {
         api, quality: QUALITY[quality], pushNotice,
-        running,
+        running: running && visible,
         setRunning, view, setView,
         onStats: setVideoStats, onHuman: claimHuman, onPanelFocus: focusPanel, overlay,
       });
@@ -1418,9 +1441,10 @@ window.__ModuleLoader__.load({
       // 同时把调色板铺成 CSS 变量：所有颜色都引用 var(--dshp-*)，深浅主题各自成立（坑 20）
       return h('div', {
         ref: rootRef,
-        style: { ...S.root, position: 'relative', fontSize: `${fontPx}px`, ...paletteVars(palette) },
+        style: { ...S.root, ...(nativeHost ? S.nativeHost : null), position: 'relative', fontSize: `${fontPx}px`, ...paletteVars(palette) },
         'data-font': fontPx,
         'data-theme': palette.dark ? 'dark' : 'light',
+        'data-dsh-native-tab-host': nativeHost ? TAB_KIND : undefined,
         tabIndex: 0,
         onWheel: onRootWheel,
         onKeyDown: onPanelKeyDown,
@@ -1446,7 +1470,7 @@ window.__ModuleLoader__.load({
 
     // 用户 2026-10-18：①截图保存地址 ②截图目录自动清理 ③skill 位置（只读）④「▶ 打开」的候选 App。
     // 设置落盘在宿主 ~/.dsh/android-phone/settings.json；这里只是编辑界面。
-    // embedded=true 给 DSH 插件详情页用（不依赖 better-sidebar）：不显示「关闭」按钮、不做浮层外框。
+    // embedded=true 给 DSH 插件详情页用：不显示「关闭」按钮、不做浮层外框。
     function SettingsSheet(props) {
       const { post, onClose, embedded } = props;
       const [dir, setDir] = useState("");
@@ -1654,19 +1678,171 @@ window.__ModuleLoader__.load({
     }
 
     // DSH「插件」页 → dsh-android-phone 详情页里的设置区。
-    // 用户 2026-10-18：没装 better-sidebar 的用户也要能改设置，所以走 slots 扩展点而不是侧栏 tab。
+    // 走 slots 扩展点而不是侧栏 tab：改设置不该依赖侧栏页面能不能开。
     function PluginSettings(props) {
       const post = useMemo(() => makePagePost(props.ctx), [props.ctx]);
       return h(SettingsSheet, { post, embedded: true });
     }
+    /* ---------------------------------------------------------------- 侧栏 */
+
+    // 原生右侧栏页面的身份：id 全局唯一（同一 id 注册两次宿主抛 already registered），
+    // kind 是页面类型标识（宿主按它路由/恢复页签），title 是页签与引导胶囊上的文字。
+    const TAB_ID = 'dsh-android-phone:phone';
+    const TAB_KIND = 'android-phone';
+    const TAB_TITLE = '手机';
+    const TAB_DESC = '安卓真机：实时画面 + 操作注入 + 截图/长截图';
+    const TAB_ORDER = 61;
+
+    /** 取一个客户端服务：先看被注入的 ctx（ctx.inject 的回调参数），再退回根 ctx；两条路都试。 */
+    function readService(targets, key) {
+      for (const t of targets) {
+        if (!t) continue;
+        try {
+          if (typeof t.get === 'function') {
+            const v = t.get(key);
+            if (v) return v;
+          }
+        } catch { /* ignore */ }
+        try {
+          if (t[key]) return t[key];
+        } catch { /* ignore */ }
+      }
+      return null;
+    }
+
+    /** 侧栏页面的图标（引导胶囊里用；页签正文的图标由宿主按 title 自己画）。 */
+    function tabIcon(ctx, size) {
+      return h('img', {
+        src: `${apiBase(ctx)}/icon.png`,
+        alt: '',
+        width: size,
+        height: size,
+        style: { display: 'block', borderRadius: '50%' },
+      });
+    }
+
+    /** 读本页签的实时记录（visible = 现在是不是被选中的那个页签）；宿主没提供就当作一直在看。 */
+    function tabInfo(props) {
+      try {
+        return typeof props.useTabInfo === 'function' ? props.useTabInfo() : null;
+      } catch { return null; }
+    }
+
+    /**
+     * 原生右侧栏的「页面本体」。宿主在自己的 React 树里渲染它；keepMounted 时切页签不卸载，
+     * 所以这里自己判断 visible，把「没被看见」翻译成「停视频流」（见 Panel 的 running && visible）。
+     */
+    function NativeTabBody(props) {
+      const info = tabInfo(props);
+      const tabRec = info && info.tab;
+      const visible = !tabRec || tabRec.visible !== false;
+      // 直接渲染 Panel（不套 div）：Panel 根节点自己就是撑满宿主的那层列 flex 宿主（nativeHost）。
+      return h(Panel, { ctx: props.ctx, visible, nativeHost: true });
+    }
+
+    /**
+     * 侧栏注册：注册进 DSH **原生**右侧栏，不依赖任何第三方侧栏插件。
+     *
+     * 原生这边有两半，缺一不可：
+     *  - ctx.inject(['sidebarRightTabs']) → tabs.register({ id, kind, title, keepMounted, guide })：
+     *    把「手机」变成右侧栏的一个页面类型，并挂一个引导胶囊（右侧栏打开时先看到引导页，点它即打开）；
+     *  - ctx.slots.inject('sidebar.right.pane.tab') → 注册页面本体组件（上面的 NativeTabBody）。
+     * sidebarRightTabs 是「后到位」的服务（侧栏座位先声明插槽、再 provide 它），所以只能等它出现再注册；
+     * 在插槽声明那一刻直接读服务会读到 undefined 且永不重试，整块静默失效。
+     * @returns 撤销函数 —— 调用方必须包在 ctx.effect 里，否则 HMR 二次激活会抛 already registered。
+     */
+    function registerSidebar(ctx) {
+      let nativeOff = null;   // 原生侧栏注册的撤销函数（null = 还没注册上）
+      let seat = null;        // ctx.inject 的座位
+      let dead = false;
+
+      /** 真正注册到原生右侧栏；返回撤销函数，注册条件不满足时返回 null。 */
+      const attach = (scoped) => {
+        if (dead || nativeOff) return null;
+        const tabs = readService([scoped, ctx], 'sidebarRightTabs');
+        if (!tabs || typeof tabs.register !== 'function') return null;
+
+        const offs = [];
+        let released = false;
+        const release = () => {
+          if (released) return;
+          released = true;
+          nativeOff = null;
+          while (offs.length) {
+            const off = offs.pop();
+            try {
+              if (typeof off === 'function') off();
+              else if (off && typeof off.dispose === 'function') off.dispose();
+            } catch (e) { console.warn('[android-phone] 撤销侧栏注册失败', e); }
+          }
+        };
+
+        try {
+          offs.push(tabs.register({
+            id: TAB_ID,
+            kind: TAB_KIND,
+            // keepMounted：切到别的页签再切回来不重建面板（画面、设置页、控制权都留着）
+            keepMounted: true,
+            title: () => TAB_TITLE,
+            guide: [{
+              id: TAB_KIND,
+              order: TAB_ORDER,
+              title: () => TAB_TITLE,
+              description: () => TAB_DESC,
+              icon: (p) => tabIcon(ctx, (p && p.size) || 16),
+            }],
+          }));
+
+          const slots = readService([scoped, ctx], 'slots');
+          if (slots && typeof slots.inject === 'function' && typeof slots.register === 'function') {
+            offs.push(slots.inject('sidebar.right.pane.tab', () => slots.register({
+              name: 'sidebar.right.pane.tab',
+              key: TAB_ID,
+              // 插槽的注入函数拿到 sessionId，返回给 body 组件当 props（框架会再补 useTabInfo 之类的框架 props）
+              inject: () => ({ ctx, name }),
+            }, NativeTabBody)));
+          } else {
+            console.warn('[android-phone] 没有 slots 扩展点，侧栏页面本体未注册（页签会点开一片空白）');
+          }
+        } catch (e) {
+          console.warn('[android-phone] 原生侧栏注册失败', e);
+          release();
+          return null;
+        }
+
+        nativeOff = release;
+        return release;
+      };
+
+      if (typeof ctx.inject === 'function') {
+        seat = ctx.inject(['sidebarRightTabs'], (scoped) => {
+          const off = attach(scoped);
+          if (typeof off !== 'function') return undefined;
+          return off;   // 交给框架：依赖消失时自动撤销
+        });
+      } else if (typeof attach(ctx) !== 'function') {
+        // 极老宿主：既没有 ctx.inject 也没有 sidebarRightTabs
+        console.warn('[android-phone] 宿主没有 sidebarRightTabs（DSH 太老）：侧栏页面不可用；插件页设置区与 phone_* 工具不受影响');
+      }
+
+      return () => {
+        dead = true;
+        if (typeof nativeOff === 'function') nativeOff();
+        nativeOff = null;
+        if (seat && typeof seat.dispose === 'function') { try { seat.dispose(); } catch { /* ignore */ } }
+        else if (typeof seat === 'function') { try { seat(); } catch { /* ignore */ } }
+      };
+    }
+
     /* ---------------------------------------------------------------- 注册 */
 
     const name = 'dsh-android-phone';
-    // 刻意不把 betterSidebar 声明成必需依赖：没装它的用户，插件页设置区照样要能用。
+    // 刻意不把任何服务声明成必需依赖：侧栏走原生右侧栏（sidebarRightTabs 由 registerSidebar
+    // 用 ctx.inject 懒等），插件页设置区也要在服务缺失时照样能注册。
     const inject = [];
 
     function apply(ctx) {
-      // ① DSH「插件」页 → 本插件详情页里的设置区（slots 扩展点，与 better-sidebar 无关）。
+      // ① DSH「插件」页 → 本插件详情页里的设置区（slots 扩展点，与侧栏无关）。
       //    宿主把 plugins.bundle.config 的 key 与本包名对上时才会渲染（key 必须等于包名）。
       try {
         const slots = ctx.slots;
@@ -1686,35 +1862,13 @@ window.__ModuleLoader__.load({
         console.warn('[android-phone] 插件页设置区注册失败', e);
       }
 
-      // ② 侧栏 tab：只有装了 better-sidebar 才有。用 ctx.inject 等它就绪（激活顺序无关）。
-      const registerTab = (c) => {
-        const cc = c || ctx;
-        const sb = cc.betterSidebar;
-        if (!sb || typeof sb.registerTab !== 'function') {
-          console.warn('[android-phone] 没有 betterSidebar.registerTab，侧栏 tab 未注册（插件页设置区不受影响）');
-          return;
-        }
-        cc.effect(() => sb.registerTab({
-          id: 'dsh-android-phone',
-          title: '手机',
-          description: '安卓真机：实时画面 + 操作注入 + 截图/长截图',
-        icon: h('img', {
-          src: `${apiBase(cc)}/icon.png`,
-          alt: '',
-          width: 16,
-          height: 16,
-          style: { display: 'block', borderRadius: '50%' },
-        }),
-          order: 61,
-          single: true,
-          component: () => h(Panel, { ctx }),
-        }), 'android-phone: sidebar tab');
-      };
+      // ② 侧栏页面：注册进 DSH 原生右侧栏（见 registerSidebar）。
+      //    必须包在 ctx.effect 里，否则 HMR 二次激活会抛 already registered。
       try {
-        if (typeof ctx.inject === 'function') ctx.inject(['betterSidebar'], registerTab);
-        else registerTab(ctx);
+        if (typeof ctx.effect === 'function') ctx.effect(() => registerSidebar(ctx), 'android-phone: sidebar');
+        else registerSidebar(ctx);
       } catch (e) {
-        console.warn('[android-phone] 侧栏 tab 注册失败', e);
+        console.warn('[android-phone] 侧栏注册失败', e);
       }
     }
 

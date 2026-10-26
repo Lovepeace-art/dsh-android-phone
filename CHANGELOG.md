@@ -2,6 +2,37 @@
 
 本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## 1.0.1 — 2026-10-26 · 侧栏改用 DSH 原生右侧栏（彻底不再依赖 dsh-better-sidebar）
+
+> 开发期曾把「原生优先 + 老宿主兜底 better-sidebar」记为 1.0.2，该版本从未发布；取消兼容后的最终形态统一按 **1.0.1** 发布。
+
+### 变更
+
+- **侧栏面板改注册进 DSH 原生右侧栏**：`client.js` 在 `ctx.inject(['sidebarRightTabs'], …)` 里
+  `tabs.register({ id: 'dsh-android-phone:phone', kind: 'android-phone', title: '手机', keepMounted: true, guide })`，
+  页面本体走插槽 `ctx.slots.register({ name: 'sidebar.right.pane.tab', key: 'dsh-android-phone:phone', inject }, NativeTabBody)`。
+  结果是**不装任何第三方侧栏插件也能在右侧栏看到手机画面**。
+- **打开方式**：DSH 右侧栏自己的开关按钮 → 引导胶囊（`guide`）里的「📱 手机」（`order: 61`）。
+- **不再有任何 `dsh-better-sidebar` 代码路径**：删掉 `ctx.betterSidebar.registerTab` 兜底与它的撤销逻辑；`apiBase` 也不再调用
+  `ctx.betterSidebar.hostRouteUrl`，一律按相对页面 base 解析（反向代理子目录与 Electron 壳都成立）。
+- **删掉 `package.json` 里的 `peerDependencies.dsh-better-sidebar`**：它不再是本插件的依赖声明。
+- **不在当前页签时自动暂停视频流**（省手机电量与带宽），切回来自动重连。
+- **修正**：面板启动时预读设置的请求写成了 `` fetch(`\${apiBase(ctx)}/settings`) `` —— 模板字符串被转义、实际请求的是字面量
+  `${apiBase(ctx)}/settings`，导致工具栏「打开 App」的候选列表一直读不到设置里的值、静默退回默认 6 个；现已改回真插值。
+- 插件页（DSH「插件」→ `dsh-android-phone` 详情页）里的设置区不变。
+- 文档同步：`README.md` / `README.en.md` / `CONTRIBUTING.md` / `docs/usage.md` / `docs/troubleshooting.md` 里凡是
+  「装 / 不装 `dsh-better-sidebar` 才有侧栏面板」「老宿主自动退回它」的说法，全部改成「侧栏面板是 DSH 原生右侧栏功能，
+  与它无关，也不需要安装」；排障里「右侧栏没有 📱 手机页签」的原因只剩两条 —— DSH 版本太老没有 `sidebarRightTabs`
+  注册表，或者右侧栏没打开。
+
+### 老用户升级
+
+`git pull` 后重启 DSH；只改了 `client.js` 的话，硬刷新侧栏（Ctrl+Shift+R）也能生效。以前装过 `dsh-better-sidebar` 的留着不碍事。
+
+宿主没有 `sidebarRightTabs` 注册表的 DSH（较老版本）**没有侧栏页面了** —— 兜底那条路已经删除。这种情况下照样能用：
+设置项在 DSH「插件」页 → 本插件详情页，12 个 `phone_*` 工具照常可用；想在侧栏里看手机画面，**升级 DSH** 就好，
+不需要再装任何侧栏插件。
+
 ## 1.0.0 — 2026-10-18 · 首个公开发布
 
 > 这是仓库的首次公开发布。开发期用过 0.1 / 0.2 / 0.3 内部编号（见下方三节），内容已全部并入 1.0.0，那些编号不对应任何 tag。

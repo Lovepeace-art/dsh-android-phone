@@ -8,7 +8,7 @@
 
 ## Features
 
-- With `dsh-better-sidebar` installed, the phone screen is **shown live** in a sidebar tab; without it the AI can **still operate the phone**
+- The phone screen is **shown live in DSH's native right sidebar**; the same capabilities are exposed to the model, so the AI can operate the phone too
 - **Sub-millisecond input**: tap, long-press, drag, wheel scroll, pinch zoom, PC keyboard passthrough
 - **Screenshots / long screenshots** (scroll-and-stitch)
 - The same capabilities are exposed to the model as tools — "AI operates the phone" and "user views the phone" share **one pipeline and one session**
@@ -22,7 +22,7 @@
 | DSH | desktop profile, `>= 0.2.0-rc.2` |
 | Node | ≥ 20 (zero npm dependencies at runtime: adb is called as a CLI, PNG codec ships in `src/core/png.js`) |
 | Android phone | "Developer options → USB debugging" on, plugged in, tap "Always allow" on the RSA prompt; any USB mode works |
-| Optional | `dsh-better-sidebar ^0.25.0` — needed only for the sidebar tab. Without it there is no live view in the sidebar, but **settings still work on DSH's "Plugins" page** and the model tools keep working |
+| Not needed | `dsh-better-sidebar` — the pane is a native DSH right-sidebar feature, unrelated to it, and you don't need to install it |
 
 ## Install
 
@@ -33,7 +33,7 @@ Use DSH's built-in installer; no script to run:
 3. Install (DSH's bundled pnpm handles dependencies and registration)
 4. **Restart DSH**
 
-After installing, the plugin shows up on DSH's "Plugins" page (enable/disable and configure it there); with better-sidebar installed, a "Phone" tab appears in the sidebar too.
+After installing, the plugin shows up on DSH's "Plugins" page (enable/disable and configure it there); a "📱 Phone" tab also appears in the right sidebar — open it with **DSH's own right-sidebar toggle → pick "📱 Phone" in the guide chips**.
 
 > **Not published to npm yet**, so installing "by package name" does not work — use a local path or the Git URL.
 > Install/uninstall details: [Usage · Install & uninstall](docs/usage.md#安装与卸载) (Chinese).

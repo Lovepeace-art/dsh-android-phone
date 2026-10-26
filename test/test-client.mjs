@@ -64,15 +64,21 @@ const idMatch = checkSrc.match(/__ModuleLoader__\.load\(\{\s*id:\s*['"]([^'"]+)[
 check('模块 id 等于 package.json 的 name', idMatch?.[1] === pkg.name, `${idMatch?.[1]} vs ${pkg.name}`);
 const requires = [...checkSrc.matchAll(/require\(\s*['"]([^'"]+)['"]\s*\)/g)].map((m) => m[1]);
 check('只 require 了 baseline 包（react）', requires.length > 0 && requires.every((r) => r === 'react'), requires.join(', '));
-check('betterSidebar 不是必需依赖（没装也要能用插件页设置区）', /const inject = \[\]/.test(checkSrc));
-check('用 ctx.inject 等 betterSidebar 就绪', /ctx\.inject\(\['betterSidebar'\]/.test(checkSrc));
-check('registerTab 包在 ctx.effect 里', /cc\.effect\(\(\)\s*=>\s*sb\.registerTab\(/.test(checkSrc));
+check('没有必需依赖（inject 为空：不声明任何服务为前置条件）', /const inject = \[\]/.test(checkSrc));
+check('用 ctx.inject 等原生 sidebarRightTabs 就绪', /ctx\.inject\(\['sidebarRightTabs'\]/.test(checkSrc));
+check('侧栏页面注册进原生右侧栏（页签注册 + sidebar.right.pane.tab 插槽 + 引导胶囊 + keepMounted）',
+  /sidebar\.right\.pane\.tab/.test(checkSrc) && /guide:\s*\[\{/.test(checkSrc) && /keepMounted:\s*true/.test(checkSrc));
+check('侧栏注册包在 ctx.effect 里（HMR 二次激活不抛 already registered）', /ctx\.effect\(\(\)\s*=>\s*registerSidebar\(ctx\)/.test(checkSrc));
+check('完全不依赖 dsh-better-sidebar（没有 registerTab / hostRouteUrl / betterSidebar）',
+  !/registerTab\s*\(/.test(checkSrc) && !/hostRouteUrl/.test(checkSrc) && !/betterSidebar/.test(checkSrc));
 check('注册了插件页设置区 plugins.bundle.config（key=包名）', /slots\.inject\('plugins\.bundle\.config'/.test(checkSrc) && /key:\s*'dsh-android-phone'/.test(checkSrc));
 check('设置页有「打开 App」区块（新增/保存/包名输入）', /data-app-add/.test(checkSrc) && /data-app-save/.test(checkSrc) && /data-app-pkg/.test(checkSrc));
-check('hostRouteUrl 不带前导斜杠', /hostRouteUrl\(\s*['"]dsh-android-phone\/api['"]\s*\)/.test(checkSrc)
-  && !/hostRouteUrl\(\s*['"]\//.test(checkSrc));
+check('路由前缀走「相对页面 base 解析」（不能带前导斜杠钉死源站根目录）',
+  /const rel = ['"]dsh-android-phone\/api\/['"]/.test(checkSrc)
+  && /new URL\(rel,\s*base\)/.test(checkSrc));
 check('用了 WebCodecs 的 VideoDecoder 并带降级', /VideoDecoder/.test(checkSrc) && /startPoll/.test(checkSrc));
 check('动作坐标为 0~1 相对值（nx/ny）', /nx:\s*\(ev\.clientX/.test(checkSrc) || /nx\b/.test(checkSrc));
+check('面板把「没被看见」翻译成停视频流（Screen 的 running = running && visible）', /running:\s*running\s*&&\s*visible/.test(checkSrc));
 
 /* ---------------------------------------------------------------- 假 window + 假 fetch */
 
@@ -142,7 +148,9 @@ function loadModule(fakeWindow) {
   return captured;
 }
 
-const dom = new JSDOM('<!doctype html><html><body><div id="root"></div></body></html>', { pretendToBeVisual: true });
+// 给 jsdom 一个真实的页面 URL：apiBase() 用 document.baseURI 相对解析宿主路由前缀，
+// 停在默认的 about:blank 上就只能走兜底分支，测不到正路。
+const dom = new JSDOM('<!doctype html><html><body><div id="root"></div></body></html>', { pretendToBeVisual: true, url: 'http://localhost/' });
 const w = dom.window;
 // react-dom 会直接读全局 window/document，必须把 jsdom 的世界挂到 global 上
 global.window = w;
@@ -191,19 +199,37 @@ try {
   });
 } catch { /* 只读就跳过 */ }
 
-const mediaStore = { tabs: [], effectCount: 0, hostRouteUrlArgs: [], slotRegs: [], slotInjected: [] };
-const ctx = {
-  betterSidebar: {
-    hostRouteUrl: (p) => { mediaStore.hostRouteUrlArgs.push(p); return `http://127.0.0.1:19399/${p}`; },
-    registerTab: (tab) => { mediaStore.tabs.push(tab); return () => {}; },
+// 假 ctx：只有原生右侧栏（sidebarRightTabs）+ slots + effect —— 不再提供 betterSidebar，
+// 因为 better-sidebar 兼容已删除，插件不该再碰它（下面有「只给 betterSidebar 什么也不会发生」的用例）。
+const mediaStore = {
+  tabs: [], effectCount: 0, slotRegs: [], slotInjected: [],
+  injectDeps: [], nativeDisposed: 0,
+};
+const nativeTabs = {
+  register(def) {
+    mediaStore.tabs.push(def);
+    return () => { mediaStore.nativeDisposed += 1; };
   },
+};
+const ctx = {
+  sidebarRightTabs: nativeTabs,
   slots: {
     injected: [],
     register(spec, comp) { mediaStore.slotRegs.push({ spec, comp }); return () => {}; },
     inject(name, fn) { mediaStore.slotInjected.push(name); return fn(); },
   },
   effect: (fn) => { mediaStore.effectCount += 1; return fn(); },
-  get: () => undefined,
+  // ctx.inject 只被用来等 sidebarRightTabs（与真宿主一致：侧栏服务是后到位的）
+  inject(deps, fn) {
+    mediaStore.injectDeps.push(deps.join(','));
+    const scoped = {
+      get: (n) => (n === 'sidebarRightTabs' ? nativeTabs : undefined),
+      effect: (f) => { mediaStore.effectCount += 1; return f(); },
+    };
+    const out = fn(scoped);
+    return { dispose: () => { if (typeof out === 'function') out(); } };
+  },
+  get: (n) => (n === 'sidebarRightTabs' ? nativeTabs : undefined),
 };
 
 const mod = loadModule(w);
@@ -227,19 +253,54 @@ try {
 let applyOk = true; let applyErr = '';
 try { exported.apply(ctx); } catch (e) { applyOk = false; applyErr = e.message; }
 check('apply 不抛异常', applyOk, applyErr);
-check('registerTab 被调用一次且包在 ctx.effect 里', mediaStore.tabs.length === 1 && mediaStore.effectCount >= 1, `${mediaStore.tabs.length} tabs / ${mediaStore.effectCount} effects`);
-const tab = mediaStore.tabs[0] || {};
-// tab 图标自 2026-10-18 起是图片（betterSidebar 的 icon 支持 ReactNode）：
-// 断言它是个 <img>，src 指向插件自己的 /icon.png 路由。
-const tabIconSrc = tab.icon && tab.icon.props && tab.icon.props.src ? String(tab.icon.props.src) : '';
-check('tab 元数据正确（id/title/icon/single）', tab.id === pkg.name && tab.title === '手机' && /\/dsh-android-phone\/api\/icon\.png$/.test(tabIconSrc) && tab.single === true, JSON.stringify({ id: tab.id, title: tab.title, icon: tabIconSrc, single: tab.single }));
+check('原生侧栏页签被注册一次（用 ctx.inject 等 sidebarRightTabs 就绪）',
+  mediaStore.tabs.length === 1 && mediaStore.effectCount >= 1 && mediaStore.injectDeps.includes('sidebarRightTabs'),
+  `${mediaStore.tabs.length} tabs / ${mediaStore.effectCount} effects / inject=${mediaStore.injectDeps.join(';')}`);
 
-// betterSidebar 缺失时只 warn 不抛
+// 侧栏页面本体由 sidebar.right.pane.tab 插槽注册（宿主渲染它，不是我们 return 组件）
+const bodyReg = mediaStore.slotRegs.find((r) => r.spec?.name === 'sidebar.right.pane.tab') || {};
+check('注册了侧栏页面本体 sidebar.right.pane.tab（key = 页签 id）',
+  !!bodyReg.comp && bodyReg.spec?.key === 'dsh-android-phone:phone',
+  JSON.stringify(bodyReg.spec || null));
+
+const tab = mediaStore.tabs[0] || {};
+// 页签图标自 2026-10-18 起是图片；原生右侧栏里它挂在引导胶囊（guide）上：
+// 断言 icon() 返回的 <img> 指向插件自己的 /icon.png 路由。
+const guide = Array.isArray(tab.guide) ? tab.guide[0] : null;
+let guideIconSrc = '';
+try {
+  const el = guide && guide.icon ? guide.icon({ size: 16 }) : null;
+  guideIconSrc = el && el.props && el.props.src ? String(el.props.src) : '';
+} catch { /* ignore */ }
+check('页签元数据正确（id/kind/title/keepMounted/引导胶囊含 icon.png）',
+  tab.id === 'dsh-android-phone:phone' && tab.kind === 'android-phone'
+    && typeof tab.title === 'function' && tab.title() === '手机'
+    && tab.keepMounted === true
+    && !!guide && typeof guide.title === 'function' && guide.title() === '手机'
+    && /\/dsh-android-phone\/api\/icon\.png$/.test(guideIconSrc),
+  JSON.stringify({ id: tab.id, kind: tab.kind, title: typeof tab.title === 'function' ? tab.title() : tab.title, keepMounted: tab.keepMounted, icon: guideIconSrc }));
+// 兼容已删除：即使宿主还提供 better-sidebar 的服务，插件也不会去注册它的页签
+let sbOnlyRegisterCalls = 0;
+const ctxSbOnly = {
+  betterSidebar: {
+    registerTab: () => { sbOnlyRegisterCalls += 1; return () => {}; },
+    hostRouteUrl: (p) => `http://127.0.0.1:19399/${p}`,
+  },
+  slots: { inject: () => () => {}, register: () => () => {} },
+  effect: (fn) => fn(),
+  get: () => undefined,
+};
+let sbOnlyThrew = '';
+try { exported.apply(ctxSbOnly); } catch (e) { sbOnlyThrew = e.message; }
+check('兼容已删除：只提供 better-sidebar（没有原生 sidebarRightTabs）时不注册任何侧栏页签、也不抛错',
+  sbOnlyRegisterCalls === 0 && !sbOnlyThrew, `${sbOnlyRegisterCalls} 次 registerTab / ${sbOnlyThrew || 'ok'}`);
+
+// 什么服务都没有时只 warn 不抛
 let warnOk = true; let warned = '';
 const ctxNo = { effect: (fn) => fn(), get: () => undefined };
 try { exported.apply(ctxNo); } catch (e) { warnOk = false; warned = e.message; }
-check('betterSidebar 缺失时只警告不抛错', warnOk, warned);
-const slotReg = mediaStore.slotRegs[0] || {};
+check('既没有原生 sidebarRightTabs 也没有 ctx.inject 时只警告不抛错', warnOk, warned);
+const slotReg = mediaStore.slotRegs.find((r) => r.spec?.name === 'plugins.bundle.config') || {};
 check('注册了插件页设置区 plugins.bundle.config，且 key 等于包名', mediaStore.slotInjected.includes('plugins.bundle.config') && slotReg.spec?.name === 'plugins.bundle.config' && slotReg.spec?.key === pkg.name, JSON.stringify({ injected: mediaStore.slotInjected, spec: slotReg.spec }));
 check('插件页设置区在 summary 视图下不渲染、page 视图下渲染出设置表单', (() => { try { return slotReg.comp?.({ view: 'summary' }) === null && !!slotReg.comp?.({ view: 'page' }); } catch { return false; } })());
 
@@ -249,18 +310,27 @@ const container = w.document.getElementById('root');
 const root = createRoot(container);
 const flush = () => new Promise((r) => setTimeout(r, 0));
 
+// 宿主的真实调用形态：body 组件的 props = 插槽 inject(sessionId) 的返回值 + 框架补的 props
+// （原生右侧栏会补 useTabInfo 之类；这里按真形状造一份）
+const tabProps = {
+  ...(bodyReg.spec && typeof bodyReg.spec.inject === 'function' ? bodyReg.spec.inject('session-phone') : {}),
+  useTabInfo: () => ({
+    tab: { id: 'tab-phone', kind: 'android-phone', title: '手机', contentId: '', visible: true, navigation: { address: '', params: undefined, revision: 0 }, signal: null },
+  }),
+};
+
 let mountErr = '';
 try {
-  root.render(React.createElement(function Bound() {
-    const Tab = tab.component;
-    return React.createElement(Tab, { ctx, store: {}, scope: {}, tab, visible: true });
-  }));
+  root.render(React.createElement(bodyReg.comp, tabProps));
   await flush(); await flush(); await flush(); await flush();
 } catch (e) { mountErr = e.stack || e.message; }
 check('jsdom 挂载不抛异常', !mountErr, mountErr.split('\n').slice(0, 2).join(' | '));
 
 const html = container.innerHTML;
-check('hostRouteUrl 用的是 dsh-android-phone/api（不带前导斜杠）', mediaStore.hostRouteUrlArgs.includes('dsh-android-phone/api'), mediaStore.hostRouteUrlArgs.join(','));
+const badBaseCalls = calls.filter((c) => !String(c.url).startsWith(`${w.location.origin}/dsh-android-phone/api/`));
+check('路由前缀由相对页面 base 解析（fetch 全部打到同源 /dsh-android-phone/api/…）',
+  calls.length > 0 && badBaseCalls.length === 0,
+  badBaseCalls.length ? badBaseCalls.slice(0, 3).map((c) => c.url).join(' | ') : (calls[0]?.url || '没有请求'));
 check('渲染出画布（实时画面）', !!container.querySelector('canvas'));
 check('渲染出设备信息（型号/Android）', /WLZ-AN00/.test(html) && /Android 12/.test(html), html.slice(0, 160).replace(/\s+/g, ' '));
 check('渲染出「截图 / 长截图 / ▶ 打开」按钮', /截图/.test(html) && /长截图/.test(html) && /▶ 打开/.test(html) && !!container.querySelector('[data-open-app]'));
@@ -275,6 +345,31 @@ check('下拉不再分组（optgroup 已删）', !!launchSel && launchSel.queryS
 check('请求打到宿主 base（/dsh-android-phone/api/status）', calls.some((c) => c.url.includes('/dsh-android-phone/api/status')), calls[0]?.url || '没有请求');
 check('没有 WebCodecs 时降级成快照模式（界面提示）', /快照|WebCodecs|退回/.test(html), (html.match(/[^>]{0,60}(快照|WebCodecs)[^<]{0,40}/) || [])[0] || '');
 check('降级后仍在轮询 /snapshot', calls.filter((c) => c.url.includes('/snapshot')).length >= 1 || true, 'jsdom 里 createImageBitmap 是桩，轮询可能尚未触发');
+
+// 原生右侧栏 keepMounted 会把面板留在树上，切走时只把 visible 变成 false：
+// 这时必须自己停流（不再发 /video、/snapshot），否则等于在看不见的地方持续吃手机电量。
+{
+  // 只数 /video：主面板在 jsdom 里会退回 /snapshot 轮询（每秒 2 张），那条会干扰计数。
+  const videoCalls = () => calls.filter((c) => c.url.includes('/video')).length;
+  const before = videoCalls();
+  const c3 = w.document.createElement('div');
+  w.document.body.appendChild(c3);
+  const r3 = createRoot(c3);
+  try {
+    r3.render(React.createElement(bodyReg.comp, {
+      ...tabProps,
+      useTabInfo: () => ({
+        tab: { id: 'tab-phone', kind: 'android-phone', title: '手机', contentId: '', visible: false, navigation: { address: '', params: undefined, revision: 0 }, signal: null },
+      }),
+    }));
+    await flush(); await flush(); await flush(); await flush();
+    check('页签没被选中（visible:false）时不拉视频流（不发 /video）',
+      videoCalls() === before, `新增 ${videoCalls() - before} 个 /video`);
+  } finally {
+    try { r3.unmount(); } catch { /* ignore */ }
+    c3.remove();
+  }
+}
 
 const click = async (label) => {
   const btn = [...container.querySelectorAll('button')].find((b) => b.textContent.includes(label));
@@ -701,10 +796,7 @@ if (rootEl) {
   w.document.body.appendChild(c2);
   const r2 = createRoot(c2);
   try {
-    r2.render(React.createElement(function Bound2() {
-      const Tab2 = tab.component;
-      return React.createElement(Tab2, { ctx, store: {}, scope: {}, tab, visible: true });
-    }));
+    r2.render(React.createElement(bodyReg.comp, tabProps));
     await flush(); await flush(); await flush(); await flush();
     check('宿主收到手机剪贴板（/status.clipboard）就自动写进系统剪贴板',
       clipWrites.includes('手机复制的中文'),

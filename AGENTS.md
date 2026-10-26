@@ -78,6 +78,13 @@ DSH（DeepSeek Harness）插件：把安卓真机搬进 DSH 侧栏（实时画�
 9. **不引入运行时依赖**。`devDependencies` 只给测试用（react / react-dom / jsdom）。新增任何运行期依赖需要
    先讨论，因为它会破坏「拷目录即用」。
 10. **`vendor/` 原样分发，不修改**。升级 = 整包替换 + 在 `NOTICE` 注明版本与来源。
+11. **侧栏只走 DSH 原生右侧栏，不依赖任何第三方侧栏插件**（1.0.1 起）。原生这边有两半、缺一不可：
+    `ctx.sidebarRightTabs.register({ id, kind, title, keepMounted, guide })` 注册页签类型 + 引导胶囊，
+    `ctx.slots` 注册 `sidebar.right.pane.tab` 拿页面本体。`sidebarRightTabs` 是**后到位**的服务
+    （侧栏座位先声明插槽、再 provide 它），所以只能 `ctx.inject(['sidebarRightTabs'], …)` 等它出现 ——
+    在插槽声明那一刻直接读服务永远读到 `undefined`，注册不上去且不会报错。整个注册必须包在 `ctx.effect` 里，
+    否则 HMR 二次激活抛 `already registered`。**不要**再加回 `dsh-better-sidebar` 的 `registerTab` 兜底，
+    也**不要**再调 `ctx.betterSidebar.hostRouteUrl`（路由前缀一律由 `apiBase` 按页面 base 相对解析）。
 
 ## 5. 改动检查清单
 
@@ -94,7 +101,7 @@ DSH（DeepSeek Harness）插件：把安卓真机搬进 DSH 侧栏（实时画�
 
 | 命令 | 覆盖 | 需要真机 |
 |---|---|---|
-| `npm test` | `test-stitch`（35 项，逐像素拼接）+ `test-client`（93 项，侧栏 UI / 键盘含 Ctrl+A / 剪贴板 / 设置 / 打开 App） | 否 |
+| `npm test` | `test-stitch`（35 项，逐像素拼接）+ `test-client`（95 项，侧栏 UI / 键盘含 Ctrl+A / 剪贴板 / 设置 / 打开 App / 原生右侧栏注册与「没被看见就停流」） | 否 |
 | `npm run test:device` | `test-plugin-tools`（工具与编码）+ `test-session`（单会话长跑）+ `test-host`（HTTP）+ `test-e2e-jd`（京东全链路） | **是** |
 
 真机测试会抢手机焦点、打开设置/京东等 App。跑之前把手机放一边；别在登着他人账号的手机上走到购买/支付路径；
@@ -112,6 +119,11 @@ DSH（DeepSeek Harness）插件：把安卓真机搬进 DSH 侧栏（实时画�
 9. **`adb reverse --remove tcp:<port>` 删不掉映射** → 必须按 `localabstract:scrcpy_*` 删；启动前用 `sweepScrcpyReverseSync()` 清残留。
 10. **静止画面 fps 低** → 虚拟显示只在内容变化时出帧，5~6fps 是正常的，不要试图「补帧」。
 11. **`.NET` 文件 API 用进程 CWD，不认 PowerShell 的 `Set-Location`** → 脚本里一律用绝对路径。
+12. **右侧栏里没有「手机」页签 / 点开一片空白** → 没页签：宿主的 `sidebarRightTabs` 不存在（DSH 太老，
+    控制台会 warn 一句「宿主没有 sidebarRightTabs」），或者右侧栏根本没打开（点右侧栏自己的开关按钮 →
+    引导胶囊里选「手机」）；点开空白是只注册了页签类型、没注册 `sidebar.right.pane.tab` 页面本体，
+    或 body 组件没撑满（宿主 pane body 是**块级滚动容器**，不是 flex 列，根节点必须自带 `height:100%`
+    的列 flex 宿主，见 `S.nativeHost`）。
 
 ## 7. 不要做
 
